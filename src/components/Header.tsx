@@ -1,10 +1,19 @@
 import { Link, useRouter } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { getMyRoles } from "@/lib/admin.functions";
 
 export function Header() {
   const { user } = useAuth();
   const router = useRouter();
+  const fetchMyRoles = useServerFn(getMyRoles);
+  const rolesQ = useQuery({
+    queryKey: ["my-roles"],
+    queryFn: () => fetchMyRoles(),
+    enabled: !!user,
+  });
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -23,6 +32,9 @@ export function Header() {
             <Link to="/choose" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Catálogo</Link>
             <Link to="/recommendations" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Recomendações</Link>
             <Link to="/list" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Minha Lista</Link>
+            {rolesQ.data?.isAdmin && (
+              <Link to="/admin" className="rounded px-3 py-1.5 text-primary hover:bg-secondary">Admin</Link>
+            )}
             <button onClick={signOut} className="ml-2 rounded px-3 py-1.5 text-muted-foreground hover:text-primary">Sair</button>
           </nav>
         ) : (
