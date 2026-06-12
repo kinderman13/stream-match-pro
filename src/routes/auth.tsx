@@ -1,6 +1,8 @@
 import { createFileRoute, useRouter, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserState } from "@/lib/user-data.functions";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
