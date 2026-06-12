@@ -33,8 +33,9 @@ function ProvidersPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="text-2xl font-bold">Onde você assiste?</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Selecione seus serviços. Você só verá conteúdos disponíveis neles.</p>
+      <h1 className="text-2xl font-bold">Onde você pretende assistir?</h1>
+      <p className="mt-1 text-sm text-muted-foreground">Selecione suas plataformas. Você só verá conteúdos disponíveis nelas.</p>
+
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {entries.map(([key, id]) => {
           const on = selected.has(id);
@@ -58,6 +59,7 @@ function ProvidersPage() {
       >
         Continuar
       </button>
+
     </div>
   );
 }

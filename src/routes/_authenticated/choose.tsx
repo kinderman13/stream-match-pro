@@ -1,41 +1,52 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { useServerFn } from "@tanstack/react-start";
-import { getUserState } from "@/lib/user-data.functions";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/choose")({
   component: Choose,
 });
 
+type Choice = "movie" | "tv";
+
 function Choose() {
   const router = useRouter();
-  const state = useServerFn(getUserState);
-
-  useEffect(() => {
-    state({}).then((s) => {
-      if (!s.onboardingCompleted) router.navigate({ to: "/onboarding" });
-      else if (!s.selectedProviders.length) router.navigate({ to: "/providers" });
-    });
-  }, [state, router]);
+  const [choice, setChoice] = useState<Choice | null>(null);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
-      <h1 className="text-3xl font-bold">O que você quer assistir hoje?</h1>
+      <h1 className="text-3xl font-bold">O que deseja assistir hoje?</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Escolha uma opção para continuar.</p>
+
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        <Link to="/catalog" search={{ type: "movie" }} className="group rounded-xl border border-border bg-card p-8 text-center hover:border-primary">
+        <button
+          type="button"
+          onClick={() => setChoice("movie")}
+          className={`rounded-xl border p-8 text-center transition ${
+            choice === "movie" ? "border-primary bg-primary/10" : "border-border bg-card hover:border-primary/60"
+          }`}
+        >
           <div className="text-5xl">🎬</div>
-          <div className="mt-3 text-xl font-bold">Filmes</div>
-        </Link>
-        <Link to="/catalog" search={{ type: "tv" }} className="group rounded-xl border border-border bg-card p-8 text-center hover:border-primary">
+          <div className="mt-3 text-xl font-bold">FILMES</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setChoice("tv")}
+          className={`rounded-xl border p-8 text-center transition ${
+            choice === "tv" ? "border-primary bg-primary/10" : "border-border bg-card hover:border-primary/60"
+          }`}
+        >
           <div className="text-5xl">📺</div>
-          <div className="mt-3 text-xl font-bold">Séries</div>
-        </Link>
+          <div className="mt-3 text-xl font-bold">SÉRIES</div>
+        </button>
       </div>
-      <div className="mt-6 text-center">
-        <Link to="/recommendations" className="text-sm text-muted-foreground hover:text-primary">
-          Ou pular para minhas recomendações →
-        </Link>
-      </div>
+
+      <button
+        type="button"
+        disabled={!choice}
+        onClick={() => choice && router.navigate({ to: "/catalog", search: { type: choice } })}
+        className="mt-8 w-full rounded-md bg-primary py-3 text-sm font-bold text-primary-foreground disabled:opacity-40"
+      >
+        CONTINUAR
+      </button>
     </div>
   );
 }
