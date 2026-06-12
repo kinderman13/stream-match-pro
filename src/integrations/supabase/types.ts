@@ -14,7 +14,177 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      interactions: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          media_type: string
+          tmdb_id: number
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          media_type: string
+          tmdb_id: number
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          media_type?: string
+          tmdb_id?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ratings: {
+        Row: {
+          created_at: string
+          id: string
+          media_type: string
+          poster_path: string | null
+          rating: number
+          source: string
+          title: string | null
+          tmdb_id: number
+          updated_at: string
+          user_id: string
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          media_type: string
+          poster_path?: string | null
+          rating: number
+          source?: string
+          title?: string | null
+          tmdb_id: number
+          updated_at?: string
+          user_id: string
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          media_type?: string
+          poster_path?: string | null
+          rating?: number
+          source?: string
+          title?: string | null
+          tmdb_id?: number
+          updated_at?: string
+          user_id?: string
+          weight?: number
+        }
+        Relationships: []
+      }
+      recommendation_history: {
+        Row: {
+          created_at: string
+          id: string
+          media_type: string
+          tmdb_id: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          media_type: string
+          tmdb_id: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          media_type?: string
+          tmdb_id?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          created_at: string
+          onboarding_completed: boolean
+          selected_providers: number[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          onboarding_completed?: boolean
+          selected_providers?: number[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          onboarding_completed?: boolean
+          selected_providers?: number[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      watchlist: {
+        Row: {
+          created_at: string
+          id: string
+          media_type: string
+          poster_path: string | null
+          title: string | null
+          tmdb_id: number
+          user_id: string
+          year: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          media_type: string
+          poster_path?: string | null
+          title?: string | null
+          tmdb_id: number
+          user_id: string
+          year?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          media_type?: string
+          poster_path?: string | null
+          title?: string | null
+          tmdb_id?: number
+          user_id?: string
+          year?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
