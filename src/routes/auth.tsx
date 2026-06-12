@@ -10,17 +10,29 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const router = useRouter();
+  const fetchState = useServerFn(getUserState);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  async function routeAfterAuth() {
+    try {
+      const s = await fetchState({});
+      if (!s.onboardingCompleted) router.navigate({ to: "/onboarding" });
+      else router.navigate({ to: "/providers" });
+    } catch {
+      router.navigate({ to: "/onboarding" });
+    }
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.navigate({ to: "/choose" });
+      if (data.session) routeAfterAuth();
     });
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,13 +48,14 @@ function AuthPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-      router.navigate({ to: "/onboarding" });
+      await routeAfterAuth();
     } catch (e: any) {
       setErr(e.message || "Erro ao autenticar");
     } finally {
       setBusy(false);
     }
   }
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
