@@ -36,19 +36,32 @@ function AdminPage() {
   const usersFn = useServerFn(adminListUsers);
   const grantFn = useServerFn(adminGrantRole);
   const revokeFn = useServerFn(adminRevokeRole);
+  const retentionFn = useServerFn(adminGetRetention);
+  const logsFn = useServerFn(adminListLogs);
+  const settingsFn = useServerFn(adminGetSettings);
+  const updateSettingFn = useServerFn(adminUpdateSetting);
+  const blockFn = useServerFn(adminBlockUser);
+  const deleteFn = useServerFn(adminDeleteUser);
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"overview" | "users" | "rankings" | "platforms" | "recs">("overview");
+  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "logs" | "settings";
+  const [tab, setTab] = useState<Tab>("overview");
 
   const dashQ = useQuery({ queryKey: ["admin-dash"], queryFn: () => dashFn() });
   const usersQ = useQuery({ queryKey: ["admin-users"], queryFn: () => usersFn() });
+  const retentionQ = useQuery({ queryKey: ["admin-retention"], queryFn: () => retentionFn(), enabled: tab === "retention" });
+  const logsQ = useQuery({ queryKey: ["admin-logs"], queryFn: () => logsFn({ data: {} }), enabled: tab === "logs" });
+  const settingsQ = useQuery({ queryKey: ["admin-settings"], queryFn: () => settingsFn(), enabled: tab === "settings" });
 
-  const tabs = [
+  const tabs: { id: Tab; label: string }[] = [
     { id: "overview", label: "Visão Geral" },
     { id: "users", label: "Usuários" },
     { id: "rankings", label: "Rankings" },
     { id: "platforms", label: "Plataformas" },
     { id: "recs", label: "Recomendações" },
-  ] as const;
+    { id: "retention", label: "Retenção" },
+    { id: "logs", label: "Logs" },
+    { id: "settings", label: "Configurações" },
+  ];
 
   return (
     <div className="mx-auto max-w-7xl p-6">
@@ -69,7 +82,7 @@ function AdminPage() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition ${
               tab === t.id
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -81,18 +94,25 @@ function AdminPage() {
       </nav>
 
       <div className="mt-6">
-        {dashQ.isLoading && <div className="text-muted-foreground">Carregando métricas…</div>}
-        {dashQ.error && <div className="text-destructive">Erro: {(dashQ.error as Error).message}</div>}
-        {dashQ.data && tab === "overview" && <Overview data={dashQ.data} />}
-        {dashQ.data && tab === "rankings" && <Rankings data={dashQ.data} />}
-        {dashQ.data && tab === "platforms" && <Platforms data={dashQ.data} />}
-        {dashQ.data && tab === "recs" && <Recs data={dashQ.data} />}
+        {tab === "overview" && (dashQ.data ? <Overview data={dashQ.data} /> : <Loading q={dashQ} />)}
+        {tab === "rankings" && (dashQ.data ? <Rankings data={dashQ.data} /> : <Loading q={dashQ} />)}
+        {tab === "platforms" && (dashQ.data ? <Platforms data={dashQ.data} /> : <Loading q={dashQ} />)}
+        {tab === "recs" && (dashQ.data ? <Recs data={dashQ.data} /> : <Loading q={dashQ} />)}
         {tab === "users" && (
-          <Users usersQ={usersQ} grantFn={grantFn} revokeFn={revokeFn} qc={qc} />
+          <Users usersQ={usersQ} grantFn={grantFn} revokeFn={revokeFn} blockFn={blockFn} deleteFn={deleteFn} qc={qc} />
         )}
+        {tab === "retention" && <Retention q={retentionQ} />}
+        {tab === "logs" && <Logs q={logsQ} />}
+        {tab === "settings" && <Settings q={settingsQ} update={updateSettingFn} qc={qc} />}
       </div>
     </div>
   );
+}
+
+function Loading({ q }: { q: { isLoading: boolean; error: unknown } }) {
+  if (q.error) return <div className="text-destructive">Erro: {(q.error as Error).message}</div>;
+  if (q.isLoading) return <div className="text-muted-foreground">Carregando…</div>;
+  return null;
 }
 
 function Kpi({ label, value, icon, tone = "default" }: { label: string; value: string | number; icon: string; tone?: "default" | "good" | "warn" | "bad" }) {
@@ -101,6 +121,7 @@ function Kpi({ label, value, icon, tone = "default" }: { label: string; value: s
     good: "from-emerald-500/15 to-emerald-500/5 border-emerald-500/20",
     warn: "from-amber-500/15 to-amber-500/5 border-amber-500/20",
     bad: "from-rose-500/15 to-rose-500/5 border-rose-500/20",
+
   }[tone];
   return (
     <div className={`rounded-xl border bg-gradient-to-br p-4 ${toneClass}`}>
