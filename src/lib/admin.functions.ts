@@ -436,9 +436,10 @@ export const adminGetSettings = createServerFn({ method: "GET" })
       .from("admin_settings")
       .select("key, value, updated_at");
     if (error) throw new Error(error.message);
-    const out: Record<string, unknown> = {};
-    for (const row of data ?? []) out[row.key] = row.value;
+    const out: Record<string, string | number | boolean | null> = {};
+    for (const row of data ?? []) out[row.key] = row.value as string | number | boolean | null;
     return out;
+
   });
 
 export const adminUpdateSetting = createServerFn({ method: "POST" })
