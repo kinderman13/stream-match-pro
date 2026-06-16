@@ -26,8 +26,10 @@ function ProvidersPage() {
 
   async function submit() {
     await save({ data: { providerIds: Array.from(selected) } });
-    router.navigate({ to: "/choose" });
+    const s = await state({});
+    router.navigate({ to: s.onboardingCompleted ? "/choose" : "/onboarding" });
   }
+
 
   const entries = Object.entries(PROVIDERS) as [ProviderKey, number][];
 

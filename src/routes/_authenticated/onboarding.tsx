@@ -85,8 +85,9 @@ function Onboarding() {
   async function finish() {
     if (count < 3) return;
     await complete({});
-    router.navigate({ to: "/providers" });
+    router.navigate({ to: "/choose" });
   }
+
 
   // Drag handlers
   function onPointerDown(e: React.PointerEvent) {
