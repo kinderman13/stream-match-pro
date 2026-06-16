@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { tmdbOnboardingFeed } from "@/lib/tmdb.functions";
 import { upsertRating, completeOnboarding, getUserState, addInteraction } from "@/lib/user-data.functions";
-import { Heart, X, Star, ThumbsDown, EyeOff } from "lucide-react";
+import { Heart, Star, ThumbsDown, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   component: Onboarding,
