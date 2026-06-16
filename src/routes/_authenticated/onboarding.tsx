@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { tmdbOnboardingFeed } from "@/lib/tmdb.functions";
 import { upsertRating, completeOnboarding, getUserState, addInteraction } from "@/lib/user-data.functions";
-import { Heart, X, Star } from "lucide-react";
+import { Heart, X, Star, ThumbsDown, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   component: Onboarding,
@@ -69,12 +69,15 @@ function Onboarding() {
     setTimeout(() => { setIdx((i) => i + 1); setExiting(null); setBusy(false); }, 250);
   }
 
-  async function handlePass() {
+  async function handlePass(action: "dislike" | "skip" = "skip") {
     if (!current || busy) return;
     setBusy(true);
     setExiting("pass");
     try {
-      await skip({ data: { tmdbId: current.id, mediaType: current.media_type, action: "skip" } });
+      await skip({ data: { tmdbId: current.id, mediaType: current.media_type, action } });
+      if (action === "dislike") {
+        await rate({ data: { tmdbId: current.id, mediaType: current.media_type, rating: 2, source: "onboarding", title: current.title, posterPath: current.poster_path } });
+      }
     } catch (e) { console.error(e); }
     setTimeout(() => { setIdx((i) => i + 1); setExiting(null); setBusy(false); }, 250);
   }
