@@ -33,18 +33,31 @@ export async function buildRecommendations(opts: {
   const { supabase, userId, mediaType, limit, surprise } = opts;
   const { getSimilar, getDetails } = await import("./tmdb.server");
 
-  // Load user signals
-  const [{ data: ratingsData }, { data: prefsData }, { data: interactionsData }, { data: historyData }] = await Promise.all([
+  // Load user signals + admin algorithm settings
+  const [{ data: ratingsData }, { data: prefsData }, { data: interactionsData }, { data: historyData }, { data: settingsData }] = await Promise.all([
     supabase.from("ratings").select("tmdb_id,media_type,rating,weight,source").eq("user_id", userId),
     supabase.from("user_preferences").select("selected_providers").eq("user_id", userId).maybeSingle(),
     supabase.from("interactions").select("tmdb_id,media_type,action").eq("user_id", userId),
     supabase.from("recommendation_history").select("tmdb_id,media_type").eq("user_id", userId).order("created_at", { ascending: false }).limit(200),
+    supabase.from("admin_settings").select("key,value"),
   ]);
 
   const ratings: UserRating[] = (ratingsData || []) as UserRating[];
   const providerIds: number[] = (prefsData?.selected_providers as number[]) || [];
   const interactions = (interactionsData || []) as { tmdb_id: number; media_type: "movie" | "tv"; action: string }[];
   const history = (historyData || []) as { tmdb_id: number; media_type: "movie" | "tv" }[];
+
+  // Resolve algorithm settings with safe defaults
+  const settingsMap = new Map<string, any>((settingsData || []).map((r: any) => [r.key, r.value]));
+  const numSetting = (k: string, d: number) => {
+    const v = settingsMap.get(k);
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : d;
+  };
+  const minRatingsForRecs = numSetting("min_ratings_for_recs", 3);
+  const weightLike = numSetting("weight_like", 1.0);
+  const weightWatched = numSetting("weight_watched", 1.5);
+  const weightDislike = numSetting("weight_dislike", -1.0);
 
   // Build exclusion set
   const exclude = new Set<string>();
