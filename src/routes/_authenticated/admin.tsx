@@ -10,7 +10,10 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
   getMyRoles, adminListUsers, adminGrantRole, adminRevokeRole, adminGetDashboard,
+  adminGetRetention, adminListLogs, adminGetSettings, adminUpdateSetting,
+  adminBlockUser, adminDeleteUser,
 } from "@/lib/admin.functions";
+
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
