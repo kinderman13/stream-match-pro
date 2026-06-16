@@ -70,33 +70,28 @@ function Onboarding() {
   const current = items[idx];
   const next = items[idx + 1];
 
-  async function handleLike() {
+  function openRating(action: "like" | "watched") {
     if (!current || busy) return;
-    setBusy(true);
-    setExiting("like");
-    try {
-      await rate({ data: { tmdbId: current.id, mediaType: current.media_type, rating: 9, source: "onboarding", title: current.title, posterPath: current.poster_path } });
-      setCount((c) => c + 1);
-    } catch (e) { console.error(e); }
-    setTimeout(() => { setIdx((i) => i + 1); setExiting(null); setBusy(false); }, 250);
+    setRatingAction(action);
+    setRatingValue(null);
+    setRatingOpen(true);
   }
-  async function handleWatched() {
+
+  async function confirmRating() {
     if (!current || busy) return;
+    if (ratingValue === null) return;
     setBusy(true);
     const rating = ratingValue;
-    // weight per spec: 9-10 extreme, 7-8 high, 5-6 neutral, 3-4 low, 0-2 extreme negative
-    const weight = rating >= 9 ? 1.5 : rating >= 7 ? 1.2 : rating >= 5 ? 1.0 : rating >= 3 ? 0.7 : 0.4;
     try {
-      await skip({ data: { tmdbId: current.id, mediaType: current.media_type, action: "watched" } });
+      await skip({ data: { tmdbId: current.id, mediaType: current.media_type, action: ratingAction } });
       await rate({ data: { tmdbId: current.id, mediaType: current.media_type, rating, source: "onboarding", title: current.title, posterPath: current.poster_path } });
-      // weight is computed server-side currently; rating itself carries the signal.
-      void weight;
       setCount((c) => c + 1);
     } catch (e) { console.error(e); }
     setRatingOpen(false);
     setExiting("like");
     setTimeout(() => { setIdx((i) => i + 1); setExiting(null); setBusy(false); }, 250);
   }
+
 
 
   async function handlePass(action: "dislike" | "skip" = "skip") {
