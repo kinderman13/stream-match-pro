@@ -214,17 +214,17 @@ function Onboarding() {
         <span className="w-16 text-center">Gostei</span>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="text-xs text-muted-foreground">
-          {count < 3 ? `Faltam ${3 - count} para continuar` : "Pronto para avançar!"}
-        </div>
+      <div className="mt-4 flex flex-col items-center gap-2">
         <button
           disabled={count < 3}
           onClick={finish}
-          className="rounded-md bg-primary px-5 py-2 text-sm font-bold text-primary-foreground disabled:opacity-40"
+          className="w-full rounded-md bg-primary px-5 py-3 text-sm font-bold text-primary-foreground disabled:opacity-40"
         >
-          Continuar
+          GERAR RECOMENDAÇÕES
         </button>
+        <div className="text-xs text-muted-foreground">
+          {count < 3 ? `Faltam ${3 - count} curtidas para liberar` : "Pronto! Toque para receber suas recomendações."}
+        </div>
       </div>
     </div>
   );
