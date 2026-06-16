@@ -35,16 +35,25 @@ function Onboarding() {
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState<{ x: number; y: number; startX: number; startY: number } | null>(null);
   const [exiting, setExiting] = useState<"like" | "pass" | null>(null);
+  const [mediaType, setMediaType] = useState<"movie" | "tv" | null>(null);
 
   useEffect(() => {
+    let mt: "movie" | "tv" | null = null;
+    try {
+      const v = sessionStorage.getItem("streammatch:contentType");
+      if (v === "movie" || v === "tv") mt = v;
+    } catch {}
+    if (!mt) { router.navigate({ to: "/choose" }); return; }
+    setMediaType(mt);
     state({}).then((s) => setCount(s.ratingsCount));
-    load(1, true);
+    load(1, true, mt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function load(p: number, reset = false) {
+  async function load(p: number, reset = false, mt?: "movie" | "tv") {
     try {
-      const r = (await feed({ data: { page: p } })) as Item[];
+      const useMt = mt ?? mediaType ?? undefined;
+      const r = (await feed({ data: { page: p, mediaType: useMt ?? undefined } })) as Item[];
       setItems((prev) => (reset ? r : [...prev, ...r]));
       setPage(p + 1);
     } catch (e) { console.error(e); }
@@ -85,7 +94,7 @@ function Onboarding() {
   async function finish() {
     if (count < 3) return;
     await complete({});
-    router.navigate({ to: "/choose" });
+    router.navigate({ to: "/recommendations" });
   }
 
 
@@ -122,8 +131,9 @@ function Onboarding() {
     <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-xl flex-col px-4 py-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Os mais assistidos</h1>
-          <p className="text-xs text-muted-foreground">Deslize ou toque no coração nos que você curtiu.</p>
+          <h1 className="text-2xl font-bold">Curta o que você gostaria de ver</h1>
+          <p className="text-xs text-muted-foreground">Você gostou de <span className="font-bold text-foreground">{count}</span> {count === 1 ? "conteúdo" : "conteúdos"}.</p>
+          <p className="mt-1 text-[11px] text-muted-foreground/80">Quanto mais conteúdos você curtir, mais precisas serão as recomendações.</p>
         </div>
         <div className="text-right text-sm">
           <div className={count >= 3 ? "text-2xl font-black text-success" : "text-2xl font-black text-primary"}>{count}</div>
@@ -204,17 +214,17 @@ function Onboarding() {
         <span className="w-16 text-center">Gostei</span>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="text-xs text-muted-foreground">
-          {count < 3 ? `Faltam ${3 - count} para continuar` : "Pronto para avançar!"}
-        </div>
+      <div className="mt-4 flex flex-col items-center gap-2">
         <button
           disabled={count < 3}
           onClick={finish}
-          className="rounded-md bg-primary px-5 py-2 text-sm font-bold text-primary-foreground disabled:opacity-40"
+          className="w-full rounded-md bg-primary px-5 py-3 text-sm font-bold text-primary-foreground disabled:opacity-40"
         >
-          Continuar
+          GERAR RECOMENDAÇÕES
         </button>
+        <div className="text-xs text-muted-foreground">
+          {count < 3 ? `Faltam ${3 - count} curtidas para liberar` : "Pronto! Toque para receber suas recomendações."}
+        </div>
       </div>
     </div>
   );

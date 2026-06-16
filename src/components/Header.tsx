@@ -29,7 +29,7 @@ export function Header() {
         </Link>
         {user ? (
           <nav className="flex items-center gap-1 text-sm">
-            <Link to="/choose" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Catálogo</Link>
+            <Link to="/providers" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Início</Link>
             <Link to="/recommendations" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Recomendações</Link>
             <Link to="/list" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Minha Lista</Link>
             {rolesQ.data?.isAdmin && (

@@ -4,9 +4,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useServerFn } from "@tanstack/react-start";
+
 import { supabase } from "@/integrations/supabase/client";
-import { getUserState } from "@/lib/user-data.functions";
+
 import { lovable } from "@/integrations/lovable";
 
 export const Route = createFileRoute("/auth")({
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const router = useRouter();
-  const fetchState = useServerFn(getUserState);
+  
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,14 +36,7 @@ function AuthPage() {
   }
 
   async function routeAfterAuth() {
-    try {
-      const s = await fetchState({});
-      if (!s.selectedProviders || s.selectedProviders.length === 0) router.navigate({ to: "/providers" });
-      else if (!s.onboardingCompleted) router.navigate({ to: "/onboarding" });
-      else router.navigate({ to: "/choose" });
-    } catch {
-      router.navigate({ to: "/providers" });
-    }
+    router.navigate({ to: "/providers" });
   }
 
 
