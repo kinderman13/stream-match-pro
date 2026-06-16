@@ -47,30 +47,47 @@ export const tmdbOnboardingFeed = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { discover, trending } = await import("./tmdb.server");
-    const page = data.page ?? 1;
-    const { data: prefs } = await context.supabase
-      .from("user_preferences")
-      .select("selected_providers")
-      .eq("user_id", context.userId)
-      .maybeSingle();
-    const providerIds = (prefs?.selected_providers as number[] | null) ?? [];
-    if (!providerIds.length) {
-      return trending(data.mediaType ?? "all", page);
-    }
-    if (data.mediaType) {
-      return discover({ mediaType: data.mediaType, page, providerIds, sortBy: "popularity.desc" });
-    }
-    const [movies, tv] = await Promise.all([
-      discover({ mediaType: "movie", page, providerIds, sortBy: "popularity.desc" }),
-      discover({ mediaType: "tv", page, providerIds, sortBy: "popularity.desc" }),
+    const startPage = data.page ?? 1;
+    const [{ data: prefs }, { data: ratingsData }, { data: interactionsData }] = await Promise.all([
+      context.supabase.from("user_preferences").select("selected_providers").eq("user_id", context.userId).maybeSingle(),
+      context.supabase.from("ratings").select("tmdb_id,media_type").eq("user_id", context.userId),
+      context.supabase.from("interactions").select("tmdb_id,media_type,action").eq("user_id", context.userId),
     ]);
-    const merged: typeof movies = [];
-    const max = Math.max(movies.length, tv.length);
-    for (let i = 0; i < max; i++) {
-      if (movies[i]) merged.push(movies[i]);
-      if (tv[i]) merged.push(tv[i]);
+    const providerIds = (prefs?.selected_providers as number[] | null) ?? [];
+    const seen = new Set<string>();
+    for (const r of (ratingsData ?? []) as { tmdb_id: number; media_type: string }[]) {
+      seen.add(`${r.media_type}:${r.tmdb_id}`);
     }
-    return merged;
+    for (const i of (interactionsData ?? []) as { tmdb_id: number; media_type: string; action: string }[]) {
+      // Only "skip" can resurface; everything else is permanently filtered out.
+      if (i.action !== "skip") seen.add(`${i.media_type}:${i.tmdb_id}`);
+    }
+
+    async function fetchPage(p: number) {
+      if (!providerIds.length) return trending(data.mediaType ?? "all", p);
+      if (data.mediaType) return discover({ mediaType: data.mediaType, page: p, providerIds, sortBy: "popularity.desc" });
+      const [movies, tv] = await Promise.all([
+        discover({ mediaType: "movie", page: p, providerIds, sortBy: "popularity.desc" }),
+        discover({ mediaType: "tv", page: p, providerIds, sortBy: "popularity.desc" }),
+      ]);
+      const merged: typeof movies = [];
+      const max = Math.max(movies.length, tv.length);
+      for (let i = 0; i < max; i++) {
+        if (movies[i]) merged.push(movies[i]);
+        if (tv[i]) merged.push(tv[i]);
+      }
+      return merged;
+    }
+
+    const out: Awaited<ReturnType<typeof fetchPage>> = [];
+    for (let p = startPage; p < startPage + 5 && out.length < 10; p++) {
+      const batch = await fetchPage(p);
+      for (const it of batch) {
+        if (!seen.has(`${it.media_type}:${it.id}`)) out.push(it);
+      }
+      if (batch.length === 0) break;
+    }
+    return out;
   });
 
 

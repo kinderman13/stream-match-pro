@@ -50,7 +50,8 @@ export async function buildRecommendations(opts: {
   const exclude = new Set<string>();
   for (const r of ratings) exclude.add(`${r.media_type}:${r.tmdb_id}`);
   for (const i of interactions) {
-    if (i.action === "watched" || i.action === "dislike") exclude.add(`${i.media_type}:${i.tmdb_id}`);
+    // Block any content the user already engaged with — only "skip" remains eligible to resurface.
+    if (i.action !== "skip") exclude.add(`${i.media_type}:${i.tmdb_id}`);
   }
   // Recent history dedupe (last 30)
   history.slice(0, 30).forEach((h) => exclude.add(`${h.media_type}:${h.tmdb_id}`));
