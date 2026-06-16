@@ -35,16 +35,25 @@ function Onboarding() {
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState<{ x: number; y: number; startX: number; startY: number } | null>(null);
   const [exiting, setExiting] = useState<"like" | "pass" | null>(null);
+  const [mediaType, setMediaType] = useState<"movie" | "tv" | null>(null);
 
   useEffect(() => {
+    let mt: "movie" | "tv" | null = null;
+    try {
+      const v = sessionStorage.getItem("streammatch:contentType");
+      if (v === "movie" || v === "tv") mt = v;
+    } catch {}
+    if (!mt) { router.navigate({ to: "/choose" }); return; }
+    setMediaType(mt);
     state({}).then((s) => setCount(s.ratingsCount));
-    load(1, true);
+    load(1, true, mt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function load(p: number, reset = false) {
+  async function load(p: number, reset = false, mt?: "movie" | "tv") {
     try {
-      const r = (await feed({ data: { page: p } })) as Item[];
+      const useMt = mt ?? mediaType ?? undefined;
+      const r = (await feed({ data: { page: p, mediaType: useMt ?? undefined } })) as Item[];
       setItems((prev) => (reset ? r : [...prev, ...r]));
       setPage(p + 1);
     } catch (e) { console.error(e); }
