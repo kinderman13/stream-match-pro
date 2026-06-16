@@ -37,7 +37,8 @@ function Onboarding() {
   const [exiting, setExiting] = useState<"like" | "pass" | null>(null);
   const [mediaType, setMediaType] = useState<"movie" | "tv" | null>(null);
   const [ratingOpen, setRatingOpen] = useState(false);
-  const [ratingValue, setRatingValue] = useState(7);
+  const [ratingValue, setRatingValue] = useState<number | null>(null);
+  const [ratingAction, setRatingAction] = useState<"like" | "watched">("like");
 
   useEffect(() => {
     let mt: "movie" | "tv" | null = null;
