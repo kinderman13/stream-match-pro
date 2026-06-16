@@ -21,6 +21,19 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [guestOpen, setGuestOpen] = useState(false);
+
+  async function enterAsGuest() {
+    setBusy(true); setErr(null);
+    try {
+      const { error } = await supabase.auth.signInAnonymously();
+      if (error) throw error;
+      await routeAfterAuth();
+    } catch (e: any) {
+      setErr(e.message || "Erro ao entrar como visitante");
+      setBusy(false);
+    }
+  }
 
   async function routeAfterAuth() {
     try {
