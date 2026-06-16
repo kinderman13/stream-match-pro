@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -10,40 +10,27 @@ import {
 } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
+  beforeLoad: async () => {
+    try {
+      const me = await getMyRoles();
+      if (!me?.isAdmin) {
+        throw redirect({ to: "/recommendations" });
+      }
+    } catch (err) {
+      if (err && typeof err === "object" && "to" in (err as any)) throw err;
+      throw redirect({ to: "/recommendations" });
+    }
+  },
   component: AdminPage,
 });
 
 const ROLES = ["admin", "moderator", "user"] as const;
 
 function AdminPage() {
-  const router = useRouter();
-  const fetchMyRoles = useServerFn(getMyRoles);
   const fetchUsers = useServerFn(adminListUsers);
   const grant = useServerFn(adminGrantRole);
   const revoke = useServerFn(adminRevokeRole);
   const qc = useQueryClient();
-
-  const meQ = useQuery({ queryKey: ["my-roles"], queryFn: () => fetchMyRoles() });
-
-  if (meQ.isLoading) {
-    return <div className="mx-auto max-w-4xl p-8 text-muted-foreground">Verificando permissões…</div>;
-  }
-  if (!meQ.data?.isAdmin) {
-    return (
-      <div className="mx-auto max-w-2xl p-8">
-        <h1 className="text-2xl font-bold">Acesso negado</h1>
-        <p className="mt-2 text-muted-foreground">
-          Esta área é restrita a administradores.
-        </p>
-        <button
-          onClick={() => router.navigate({ to: "/recommendations" })}
-          className="mt-4 rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-        >
-          Voltar
-        </button>
-      </div>
-    );
-  }
 
   return <AdminDashboard fetchUsers={fetchUsers} grant={grant} revoke={revoke} qc={qc} />;
 }
