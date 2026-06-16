@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { tmdbOnboardingFeed } from "@/lib/tmdb.functions";
 import { upsertRating, completeOnboarding, getUserState, addInteraction } from "@/lib/user-data.functions";
-import { Heart, Star, ThumbsDown, EyeOff } from "lucide-react";
+import { Heart, Star, ThumbsDown, HelpCircle, Eye } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   component: Onboarding,
@@ -36,6 +36,8 @@ function Onboarding() {
   const [drag, setDrag] = useState<{ x: number; y: number; startX: number; startY: number } | null>(null);
   const [exiting, setExiting] = useState<"like" | "pass" | null>(null);
   const [mediaType, setMediaType] = useState<"movie" | "tv" | null>(null);
+  const [ratingOpen, setRatingOpen] = useState(false);
+  const [ratingValue, setRatingValue] = useState(7);
 
   useEffect(() => {
     let mt: "movie" | "tv" | null = null;
@@ -77,6 +79,24 @@ function Onboarding() {
     } catch (e) { console.error(e); }
     setTimeout(() => { setIdx((i) => i + 1); setExiting(null); setBusy(false); }, 250);
   }
+  async function handleWatched() {
+    if (!current || busy) return;
+    setBusy(true);
+    const rating = ratingValue;
+    // weight per spec: 9-10 extreme, 7-8 high, 5-6 neutral, 3-4 low, 0-2 extreme negative
+    const weight = rating >= 9 ? 1.5 : rating >= 7 ? 1.2 : rating >= 5 ? 1.0 : rating >= 3 ? 0.7 : 0.4;
+    try {
+      await skip({ data: { tmdbId: current.id, mediaType: current.media_type, action: "watched" } });
+      await rate({ data: { tmdbId: current.id, mediaType: current.media_type, rating, source: "onboarding", title: current.title, posterPath: current.poster_path } });
+      // weight is computed server-side currently; rating itself carries the signal.
+      void weight;
+      setCount((c) => c + 1);
+    } catch (e) { console.error(e); }
+    setRatingOpen(false);
+    setExiting("like");
+    setTimeout(() => { setIdx((i) => i + 1); setExiting(null); setBusy(false); }, 250);
+  }
+
 
   async function handlePass(action: "dislike" | "skip" = "skip") {
     if (!current || busy) return;
@@ -179,7 +199,7 @@ function Onboarding() {
         )}
       </div>
 
-      <div className="mt-6 flex items-center justify-center gap-4">
+      <div className="mt-6 flex items-center justify-center gap-3">
         <button
           onClick={() => handlePass("dislike")}
           disabled={!current || busy}
@@ -190,13 +210,22 @@ function Onboarding() {
           <ThumbsDown className="h-6 w-6" />
         </button>
         <button
+          onClick={() => { if (!current || busy) return; setRatingValue(7); setRatingOpen(true); }}
+          disabled={!current || busy}
+          aria-label="Já assisti"
+          title="Já assisti"
+          className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-blue-500 bg-card text-blue-500 shadow-lg transition hover:scale-110 disabled:opacity-40"
+        >
+          <Eye className="h-6 w-6" />
+        </button>
+        <button
           onClick={() => handlePass("skip")}
           disabled={!current || busy}
           aria-label="Não assisti"
           title="Não assisti"
           className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-border bg-card text-muted-foreground shadow-lg transition hover:scale-110 hover:text-foreground disabled:opacity-40"
         >
-          <EyeOff className="h-6 w-6" />
+          <HelpCircle className="h-6 w-6" />
         </button>
         <button
           onClick={handleLike}
@@ -208,11 +237,46 @@ function Onboarding() {
           <Heart className="h-7 w-7" fill="currentColor" />
         </button>
       </div>
-      <div className="mt-2 flex items-center justify-center gap-4 text-[10px] uppercase tracking-wide text-muted-foreground">
+      <div className="mt-2 flex items-center justify-center gap-3 text-[10px] uppercase tracking-wide text-muted-foreground">
         <span className="w-14 text-center">Não gostei</span>
+        <span className="w-14 text-center">Já assisti</span>
         <span className="w-14 text-center">Não assisti</span>
         <span className="w-16 text-center">Gostei</span>
       </div>
+
+      {ratingOpen && current && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !busy && setRatingOpen(false)}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-sm text-muted-foreground">Você assistiu</div>
+            <div className="text-lg font-bold">{current.title}</div>
+            <div className="mt-4 text-sm">Qual nota você daria?</div>
+            <div className="mt-3 text-center text-5xl font-black text-primary">{ratingValue}</div>
+            <input
+              type="range"
+              min={0}
+              max={10}
+              step={1}
+              value={ratingValue}
+              onChange={(e) => setRatingValue(Number(e.target.value))}
+              className="mt-2 w-full"
+            />
+            <div className="mt-1 flex justify-between text-[10px] text-muted-foreground"><span>0</span><span>5</span><span>10</span></div>
+            <div className="mt-5 flex gap-2">
+              <button
+                disabled={busy}
+                onClick={() => setRatingOpen(false)}
+                className="flex-1 rounded-md border border-border bg-secondary px-3 py-2 text-sm font-semibold disabled:opacity-40"
+              >Cancelar</button>
+              <button
+                disabled={busy}
+                onClick={handleWatched}
+                className="flex-1 rounded-md bg-primary px-3 py-2 text-sm font-bold text-primary-foreground disabled:opacity-40"
+              >Salvar nota</button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       <div className="mt-4 flex flex-col items-center gap-2">
         <button
