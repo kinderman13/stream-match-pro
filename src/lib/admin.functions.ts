@@ -340,4 +340,162 @@ export const adminGetDashboard = createServerFn({ method: "GET" })
     };
   });
 
+// ---------------- Fase 3: ping de atividade ----------------
+
+export const pingActivity = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { error } = await context.supabase.rpc("touch_last_seen");
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------------- Fase 3: retenção ----------------
+
+export const adminGetRetention = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select("created_at, last_seen_at");
+    if (error) throw new Error(error.message);
+
+    function ret(days: number) {
+      const cutoff = Date.now() - days * 86400_000;
+      const eligible = (data ?? []).filter((p) => new Date(p.created_at).getTime() <= cutoff);
+      if (eligible.length === 0) return { eligible: 0, retained: 0, rate: 0 };
+      const retained = eligible.filter(
+        (p) => p.last_seen_at && new Date(p.last_seen_at).getTime() >= cutoff,
+      ).length;
+      return {
+        eligible: eligible.length,
+        retained,
+        rate: Math.round((retained / eligible.length) * 1000) / 10,
+      };
+    }
+    return { d1: ret(1), d7: ret(7), d30: ret(30), d90: ret(90) };
+  });
+
+// ---------------- Fase 4: logs ----------------
+
+export const adminListLogs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { category?: string; level?: string; limit?: number } | undefined) =>
+    z.object({
+      category: z.string().optional(),
+      level: z.string().optional(),
+      limit: z.number().min(1).max(500).optional(),
+    }).parse(d ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let q = supabaseAdmin
+      .from("system_logs")
+      .select("id, user_id, category, level, message, metadata, created_at")
+      .order("created_at", { ascending: false })
+      .limit(data.limit ?? 200);
+    if (data.category) q = q.eq("category", data.category);
+    if (data.level) q = q.eq("level", data.level);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+export const logEvent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { category: string; level?: string; message: string; metadata?: Record<string, unknown> }) =>
+    z.object({
+      category: z.string().min(1).max(64),
+      level: z.enum(["info", "warn", "error"]).optional(),
+      message: z.string().min(1).max(500),
+      metadata: z.record(z.string(), z.unknown()).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("system_logs").insert({
+      user_id: context.userId,
+      category: data.category,
+      level: data.level ?? "info",
+      message: data.message,
+      metadata: data.metadata ?? {},
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------------- Fase 4: configurações ----------------
+
+export const adminGetSettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { data, error } = await context.supabase
+      .from("admin_settings")
+      .select("key, value, updated_at");
+    if (error) throw new Error(error.message);
+    const out: Record<string, unknown> = {};
+    for (const row of data ?? []) out[row.key] = row.value;
+    return out;
+  });
+
+export const adminUpdateSetting = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { key: string; value: unknown }) =>
+    z.object({ key: z.string().min(1).max(64), value: z.any() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("admin_settings")
+      .upsert({ key: data.key, value: data.value as never, updated_at: new Date().toISOString(), updated_by: context.userId });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------------- Fase 4: moderação ----------------
+
+export const adminBlockUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; reason?: string; block: boolean }) =>
+    z.object({
+      userId: z.string().uuid(),
+      reason: z.string().max(500).optional(),
+      block: z.boolean(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    if (data.userId === context.userId) throw new Error("Cannot block yourself");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        blocked_at: data.block ? new Date().toISOString() : null,
+        blocked_reason: data.block ? (data.reason ?? "Bloqueado pelo administrador") : null,
+      })
+      .eq("id", data.userId);
+    if (error) throw new Error(error.message);
+    if (data.block) {
+      await supabaseAdmin.auth.admin.signOut(data.userId).catch(() => null);
+    }
+    return { ok: true };
+  });
+
+export const adminDeleteUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string }) =>
+    z.object({ userId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    if (data.userId === context.userId) throw new Error("Cannot delete yourself");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
 
