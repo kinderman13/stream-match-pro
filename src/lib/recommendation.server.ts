@@ -33,18 +33,31 @@ export async function buildRecommendations(opts: {
   const { supabase, userId, mediaType, limit, surprise } = opts;
   const { getSimilar, getDetails } = await import("./tmdb.server");
 
-  // Load user signals
-  const [{ data: ratingsData }, { data: prefsData }, { data: interactionsData }, { data: historyData }] = await Promise.all([
+  // Load user signals + admin algorithm settings
+  const [{ data: ratingsData }, { data: prefsData }, { data: interactionsData }, { data: historyData }, { data: settingsData }] = await Promise.all([
     supabase.from("ratings").select("tmdb_id,media_type,rating,weight,source").eq("user_id", userId),
     supabase.from("user_preferences").select("selected_providers").eq("user_id", userId).maybeSingle(),
     supabase.from("interactions").select("tmdb_id,media_type,action").eq("user_id", userId),
     supabase.from("recommendation_history").select("tmdb_id,media_type").eq("user_id", userId).order("created_at", { ascending: false }).limit(200),
+    supabase.from("admin_settings").select("key,value"),
   ]);
 
   const ratings: UserRating[] = (ratingsData || []) as UserRating[];
   const providerIds: number[] = (prefsData?.selected_providers as number[]) || [];
   const interactions = (interactionsData || []) as { tmdb_id: number; media_type: "movie" | "tv"; action: string }[];
   const history = (historyData || []) as { tmdb_id: number; media_type: "movie" | "tv" }[];
+
+  // Resolve algorithm settings with safe defaults
+  const settingsMap = new Map<string, any>((settingsData || []).map((r: any) => [r.key, r.value]));
+  const numSetting = (k: string, d: number) => {
+    const v = settingsMap.get(k);
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : d;
+  };
+  const minRatingsForRecs = numSetting("min_ratings_for_recs", 3);
+  const weightLike = numSetting("weight_like", 1.0);
+  const weightWatched = numSetting("weight_watched", 1.5);
+  const weightDislike = numSetting("weight_dislike", -1.0);
 
   // Build exclusion set
   const exclude = new Set<string>();
@@ -56,7 +69,13 @@ export async function buildRecommendations(opts: {
   // Recent history dedupe (last 30)
   history.slice(0, 30).forEach((h) => exclude.add(`${h.media_type}:${h.tmdb_id}`));
 
-  // Pick top-rated seeds (rating >= 7), weighted by rating * weight
+  // Gate: require minimum positive signals before personalized recs
+  const positiveSignals =
+    ratings.filter((r) => r.rating >= 6).length +
+    interactions.filter((i) => i.action === "like" || i.action === "watched").length;
+  const hasEnoughSignals = positiveSignals >= minRatingsForRecs;
+
+  // Pick top-rated seeds (rating >= 6), weighted by rating * weight
   const seeds = ratings
     .filter((r) => r.rating >= 6)
     .filter((r) => (mediaType === "all" ? true : r.media_type === mediaType))
@@ -69,35 +88,81 @@ export async function buildRecommendations(opts: {
     .sort((a, b) => b.rating * Number(b.weight) - a.rating * Number(a.weight))
     .slice(0, 8);
 
+  // Build interaction-based seeds (likes/watched as positive, dislikes as negative)
+  // Weights come from admin_settings so admins can tune the algorithm live.
+  type InteractionSeed = { tmdb_id: number; media_type: "movie" | "tv"; w: number };
+  const interactionSeeds: InteractionSeed[] = [];
+  for (const i of interactions) {
+    if (mediaType !== "all" && i.media_type !== mediaType) continue;
+    if (i.action === "like") interactionSeeds.push({ ...i, w: weightLike });
+    else if (i.action === "watched") interactionSeeds.push({ ...i, w: weightWatched });
+    else if (i.action === "dislike") interactionSeeds.push({ ...i, w: weightDislike });
+  }
+  // Cap to avoid runaway TMDB calls
+  const cappedInteractionSeeds = interactionSeeds.slice(0, 12);
+
   // Score map
   const scores = new Map<string, { item: any; score: number; type: "movie" | "tv" }>();
 
-  // For each seed, fetch similar/recommended and accumulate score
-  const seedResults = await Promise.all(
-    effectiveSeeds.map(async (s) => {
-      try {
-        const sim = await getSimilar(s.media_type, s.tmdb_id, 1);
-        return { seed: s, items: sim };
-      } catch {
-        return { seed: s, items: [] };
-      }
-    }),
-  );
+  if (hasEnoughSignals) {
+    // For each rating seed, fetch similar/recommended and accumulate score
+    const seedResults = await Promise.all(
+      effectiveSeeds.map(async (s) => {
+        try {
+          const sim = await getSimilar(s.media_type, s.tmdb_id, 1);
+          return { seed: s, items: sim };
+        } catch {
+          return { seed: s, items: [] };
+        }
+      }),
+    );
 
-  for (const { seed, items } of seedResults) {
-    const seedScore = (Number(seed.rating) / 10) * Number(seed.weight);
-    items.forEach((item, idx) => {
-      if (mediaType !== "all" && item.media_type !== mediaType) return;
-      const key = `${item.media_type}:${item.id}`;
-      if (exclude.has(key)) return;
-      const positional = 1 - idx / Math.max(items.length, 1);
-      const popularity = Math.min(item.vote_average / 10, 1);
-      const add = seedScore * (0.6 + 0.3 * positional + 0.1 * popularity);
-      const existing = scores.get(key);
-      if (existing) existing.score += add;
-      else scores.set(key, { item, score: add, type: item.media_type });
-    });
+    for (const { seed, items } of seedResults) {
+      const seedScore = (Number(seed.rating) / 10) * Number(seed.weight);
+      items.forEach((item, idx) => {
+        if (mediaType !== "all" && item.media_type !== mediaType) return;
+        const key = `${item.media_type}:${item.id}`;
+        if (exclude.has(key)) return;
+        const positional = 1 - idx / Math.max(items.length, 1);
+        const popularity = Math.min(item.vote_average / 10, 1);
+        const add = seedScore * (0.6 + 0.3 * positional + 0.1 * popularity);
+        const existing = scores.get(key);
+        if (existing) existing.score += add;
+        else scores.set(key, { item, score: add, type: item.media_type });
+      });
+    }
+
+    // Apply interaction-derived seeds with admin-tuned weights
+    const interactionResults = await Promise.all(
+      cappedInteractionSeeds.map(async (s) => {
+        try {
+          const sim = await getSimilar(s.media_type, s.tmdb_id, 1);
+          return { seed: s, items: sim };
+        } catch {
+          return { seed: s, items: [] };
+        }
+      }),
+    );
+
+    for (const { seed, items } of interactionResults) {
+      items.forEach((item, idx) => {
+        if (mediaType !== "all" && item.media_type !== mediaType) return;
+        const key = `${item.media_type}:${item.id}`;
+        if (exclude.has(key)) return;
+        const positional = 1 - idx / Math.max(items.length, 1);
+        const add = seed.w * (0.6 + 0.4 * positional);
+        const existing = scores.get(key);
+        if (existing) existing.score += add;
+        else scores.set(key, { item, score: add, type: item.media_type });
+      });
+    }
+
+    // Drop items whose accumulated score went non-positive (dislike penalty wins)
+    for (const [k, v] of scores) {
+      if (v.score <= 0) scores.delete(k);
+    }
   }
+
 
   // If no seeds (cold start), fall back to trending
   if (scores.size === 0) {
