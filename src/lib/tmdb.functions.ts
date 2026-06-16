@@ -38,13 +38,36 @@ export const tmdbDiscover = createServerFn({ method: "POST" })
   });
 
 export const tmdbOnboardingFeed = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: { page?: number }) =>
     z.object({ page: z.number().int().min(1).max(50).optional() }).parse(d),
   )
-  .handler(async ({ data }) => {
-    const { trending } = await import("./tmdb.server");
-    return trending("all", data.page ?? 1);
+  .handler(async ({ data, context }) => {
+    const { discover, trending } = await import("./tmdb.server");
+    const page = data.page ?? 1;
+    const { data: prefs } = await context.supabase
+      .from("user_preferences")
+      .select("selected_providers")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    const providerIds = (prefs?.selected_providers as number[] | null) ?? [];
+    if (!providerIds.length) {
+      return trending("all", page);
+    }
+    const [movies, tv] = await Promise.all([
+      discover({ mediaType: "movie", page, providerIds, sortBy: "popularity.desc" }),
+      discover({ mediaType: "tv", page, providerIds, sortBy: "popularity.desc" }),
+    ]);
+    // Interleave movies and tv for variety, both already filtered by provider+BR+flatrate
+    const merged: typeof movies = [];
+    const max = Math.max(movies.length, tv.length);
+    for (let i = 0; i < max; i++) {
+      if (movies[i]) merged.push(movies[i]);
+      if (tv[i]) merged.push(tv[i]);
+    }
+    return merged;
   });
+
 
 export const tmdbDetails = createServerFn({ method: "POST" })
   .inputValidator((d: { mediaType: "movie" | "tv"; id: number }) =>
