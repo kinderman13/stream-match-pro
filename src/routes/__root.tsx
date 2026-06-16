@@ -11,6 +11,8 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { useActivityPing } from "../hooks/use-activity-ping";
+
 
 function NotFoundComponent() {
   return (
@@ -119,6 +121,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useActivityPing();
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -127,3 +130,4 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
+

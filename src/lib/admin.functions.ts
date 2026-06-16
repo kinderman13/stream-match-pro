@@ -28,26 +28,71 @@ export const adminListUsers = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: profiles, error } = await supabaseAdmin
-      .from("profiles")
-      .select("id,display_name,created_at")
-      .order("created_at", { ascending: false })
-      .limit(200);
-    if (error) throw new Error(error.message);
-    const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id,role");
+
+    const [profilesRes, rolesRes, ratingsRes, interactionsRes, prefsRes] = await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("id, display_name, created_at, last_seen_at, blocked_at, blocked_reason")
+        .order("created_at", { ascending: false })
+        .limit(500),
+      supabaseAdmin.from("user_roles").select("user_id, role"),
+      supabaseAdmin.from("ratings").select("user_id, rating"),
+      supabaseAdmin.from("interactions").select("user_id, action"),
+      supabaseAdmin.from("user_preferences").select("user_id, selected_providers"),
+    ]);
+    if (profilesRes.error) throw new Error(profilesRes.error.message);
+
     const rolesByUser = new Map<string, string[]>();
-    for (const r of roles ?? []) {
+    for (const r of rolesRes.data ?? []) {
       const list = rolesByUser.get(r.user_id) ?? [];
       list.push(r.role);
       rolesByUser.set(r.user_id, list);
     }
-    return (profiles ?? []).map((p) => ({
-      id: p.id,
-      displayName: p.display_name,
-      createdAt: p.created_at,
-      roles: rolesByUser.get(p.id) ?? [],
-    }));
+    const ratingsByUser = new Map<string, { count: number; avg: number }>();
+    for (const r of ratingsRes.data ?? []) {
+      const prev = ratingsByUser.get(r.user_id) ?? { count: 0, avg: 0 };
+      prev.avg = (prev.avg * prev.count + Number(r.rating)) / (prev.count + 1);
+      prev.count += 1;
+      ratingsByUser.set(r.user_id, prev);
+    }
+    const actsByUser = new Map<string, { likes: number; dislikes: number; watched: number }>();
+    for (const i of interactionsRes.data ?? []) {
+      const prev = actsByUser.get(i.user_id) ?? { likes: 0, dislikes: 0, watched: 0 };
+      if (i.action === "like") prev.likes++;
+      else if (i.action === "dislike") prev.dislikes++;
+      else if (i.action === "watched") prev.watched++;
+      actsByUser.set(i.user_id, prev);
+    }
+    const prefsByUser = new Map<string, number[]>();
+    for (const p of prefsRes.data ?? []) {
+      prefsByUser.set(p.user_id, p.selected_providers ?? []);
+    }
+
+    const now = Date.now();
+    return (profilesRes.data ?? []).map((p) => {
+      const acts = actsByUser.get(p.id) ?? { likes: 0, dislikes: 0, watched: 0 };
+      const r = ratingsByUser.get(p.id);
+      const lastSeen = p.last_seen_at ? new Date(p.last_seen_at).getTime() : 0;
+      const active = lastSeen > 0 && now - lastSeen < 30 * 86400_000;
+      return {
+        id: p.id,
+        displayName: p.display_name,
+        createdAt: p.created_at,
+        lastSeenAt: p.last_seen_at,
+        blocked: !!p.blocked_at,
+        blockedReason: p.blocked_reason,
+        active,
+        ratingsCount: r?.count ?? 0,
+        avgRating: r ? Math.round(r.avg * 100) / 100 : 0,
+        likes: acts.likes,
+        dislikes: acts.dislikes,
+        watched: acts.watched,
+        providers: prefsByUser.get(p.id) ?? [],
+        roles: rolesByUser.get(p.id) ?? [],
+      };
+    });
   });
+
 
 export const adminGrantRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -295,4 +340,163 @@ export const adminGetDashboard = createServerFn({ method: "GET" })
     };
   });
 
+// ---------------- Fase 3: ping de atividade ----------------
+
+export const pingActivity = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { error } = await context.supabase.rpc("touch_last_seen");
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------------- Fase 3: retenção ----------------
+
+export const adminGetRetention = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select("created_at, last_seen_at");
+    if (error) throw new Error(error.message);
+
+    function ret(days: number) {
+      const cutoff = Date.now() - days * 86400_000;
+      const eligible = (data ?? []).filter((p) => new Date(p.created_at).getTime() <= cutoff);
+      if (eligible.length === 0) return { eligible: 0, retained: 0, rate: 0 };
+      const retained = eligible.filter(
+        (p) => p.last_seen_at && new Date(p.last_seen_at).getTime() >= cutoff,
+      ).length;
+      return {
+        eligible: eligible.length,
+        retained,
+        rate: Math.round((retained / eligible.length) * 1000) / 10,
+      };
+    }
+    return { d1: ret(1), d7: ret(7), d30: ret(30), d90: ret(90) };
+  });
+
+// ---------------- Fase 4: logs ----------------
+
+export const adminListLogs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { category?: string; level?: string; limit?: number } | undefined) =>
+    z.object({
+      category: z.string().optional(),
+      level: z.string().optional(),
+      limit: z.number().min(1).max(500).optional(),
+    }).parse(d ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let q = supabaseAdmin
+      .from("system_logs")
+      .select("id, user_id, category, level, message, metadata, created_at")
+      .order("created_at", { ascending: false })
+      .limit(data.limit ?? 200);
+    if (data.category) q = q.eq("category", data.category);
+    if (data.level) q = q.eq("level", data.level);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+export const logEvent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { category: string; level?: string; message: string; metadata?: Record<string, unknown> }) =>
+    z.object({
+      category: z.string().min(1).max(64),
+      level: z.enum(["info", "warn", "error"]).optional(),
+      message: z.string().min(1).max(500),
+      metadata: z.record(z.string(), z.unknown()).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("system_logs").insert({
+      user_id: context.userId,
+      category: data.category,
+      level: data.level ?? "info",
+      message: data.message,
+      metadata: (data.metadata ?? {}) as never,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------------- Fase 4: configurações ----------------
+
+export const adminGetSettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { data, error } = await context.supabase
+      .from("admin_settings")
+      .select("key, value, updated_at");
+    if (error) throw new Error(error.message);
+    const out: Record<string, string | number | boolean | null> = {};
+    for (const row of data ?? []) out[row.key] = row.value as string | number | boolean | null;
+    return out;
+
+  });
+
+export const adminUpdateSetting = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { key: string; value: unknown }) =>
+    z.object({ key: z.string().min(1).max(64), value: z.any() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("admin_settings")
+      .upsert({ key: data.key, value: data.value as never, updated_at: new Date().toISOString(), updated_by: context.userId });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------------- Fase 4: moderação ----------------
+
+export const adminBlockUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; reason?: string; block: boolean }) =>
+    z.object({
+      userId: z.string().uuid(),
+      reason: z.string().max(500).optional(),
+      block: z.boolean(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    if (data.userId === context.userId) throw new Error("Cannot block yourself");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        blocked_at: data.block ? new Date().toISOString() : null,
+        blocked_reason: data.block ? (data.reason ?? "Bloqueado pelo administrador") : null,
+      })
+      .eq("id", data.userId);
+    if (error) throw new Error(error.message);
+    if (data.block) {
+      await supabaseAdmin.auth.admin.signOut(data.userId).catch(() => null);
+    }
+    return { ok: true };
+  });
+
+export const adminDeleteUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string }) =>
+    z.object({ userId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    if (data.userId === context.userId) throw new Error("Cannot delete yourself");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
 

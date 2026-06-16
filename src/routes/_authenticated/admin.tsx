@@ -10,7 +10,10 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
   getMyRoles, adminListUsers, adminGrantRole, adminRevokeRole, adminGetDashboard,
+  adminGetRetention, adminListLogs, adminGetSettings, adminUpdateSetting,
+  adminBlockUser, adminDeleteUser,
 } from "@/lib/admin.functions";
+
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
@@ -33,19 +36,32 @@ function AdminPage() {
   const usersFn = useServerFn(adminListUsers);
   const grantFn = useServerFn(adminGrantRole);
   const revokeFn = useServerFn(adminRevokeRole);
+  const retentionFn = useServerFn(adminGetRetention);
+  const logsFn = useServerFn(adminListLogs);
+  const settingsFn = useServerFn(adminGetSettings);
+  const updateSettingFn = useServerFn(adminUpdateSetting);
+  const blockFn = useServerFn(adminBlockUser);
+  const deleteFn = useServerFn(adminDeleteUser);
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"overview" | "users" | "rankings" | "platforms" | "recs">("overview");
+  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "logs" | "settings";
+  const [tab, setTab] = useState<Tab>("overview");
 
   const dashQ = useQuery({ queryKey: ["admin-dash"], queryFn: () => dashFn() });
   const usersQ = useQuery({ queryKey: ["admin-users"], queryFn: () => usersFn() });
+  const retentionQ = useQuery({ queryKey: ["admin-retention"], queryFn: () => retentionFn(), enabled: tab === "retention" });
+  const logsQ = useQuery({ queryKey: ["admin-logs"], queryFn: () => logsFn({ data: {} }), enabled: tab === "logs" });
+  const settingsQ = useQuery({ queryKey: ["admin-settings"], queryFn: () => settingsFn(), enabled: tab === "settings" });
 
-  const tabs = [
+  const tabs: { id: Tab; label: string }[] = [
     { id: "overview", label: "Visão Geral" },
     { id: "users", label: "Usuários" },
     { id: "rankings", label: "Rankings" },
     { id: "platforms", label: "Plataformas" },
     { id: "recs", label: "Recomendações" },
-  ] as const;
+    { id: "retention", label: "Retenção" },
+    { id: "logs", label: "Logs" },
+    { id: "settings", label: "Configurações" },
+  ];
 
   return (
     <div className="mx-auto max-w-7xl p-6">
@@ -66,7 +82,7 @@ function AdminPage() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition ${
               tab === t.id
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -78,18 +94,25 @@ function AdminPage() {
       </nav>
 
       <div className="mt-6">
-        {dashQ.isLoading && <div className="text-muted-foreground">Carregando métricas…</div>}
-        {dashQ.error && <div className="text-destructive">Erro: {(dashQ.error as Error).message}</div>}
-        {dashQ.data && tab === "overview" && <Overview data={dashQ.data} />}
-        {dashQ.data && tab === "rankings" && <Rankings data={dashQ.data} />}
-        {dashQ.data && tab === "platforms" && <Platforms data={dashQ.data} />}
-        {dashQ.data && tab === "recs" && <Recs data={dashQ.data} />}
+        {tab === "overview" && (dashQ.data ? <Overview data={dashQ.data} /> : <Loading q={dashQ} />)}
+        {tab === "rankings" && (dashQ.data ? <Rankings data={dashQ.data} /> : <Loading q={dashQ} />)}
+        {tab === "platforms" && (dashQ.data ? <Platforms data={dashQ.data} /> : <Loading q={dashQ} />)}
+        {tab === "recs" && (dashQ.data ? <Recs data={dashQ.data} /> : <Loading q={dashQ} />)}
         {tab === "users" && (
-          <Users usersQ={usersQ} grantFn={grantFn} revokeFn={revokeFn} qc={qc} />
+          <Users usersQ={usersQ} grantFn={grantFn} revokeFn={revokeFn} blockFn={blockFn} deleteFn={deleteFn} qc={qc} />
         )}
+        {tab === "retention" && <Retention q={retentionQ} />}
+        {tab === "logs" && <Logs q={logsQ} />}
+        {tab === "settings" && <Settings q={settingsQ} update={updateSettingFn} qc={qc} />}
       </div>
     </div>
   );
+}
+
+function Loading({ q }: { q: { isLoading: boolean; error: unknown } }) {
+  if (q.error) return <div className="text-destructive">Erro: {(q.error as Error).message}</div>;
+  if (q.isLoading) return <div className="text-muted-foreground">Carregando…</div>;
+  return null;
 }
 
 function Kpi({ label, value, icon, tone = "default" }: { label: string; value: string | number; icon: string; tone?: "default" | "good" | "warn" | "bad" }) {
@@ -98,6 +121,7 @@ function Kpi({ label, value, icon, tone = "default" }: { label: string; value: s
     good: "from-emerald-500/15 to-emerald-500/5 border-emerald-500/20",
     warn: "from-amber-500/15 to-amber-500/5 border-amber-500/20",
     bad: "from-rose-500/15 to-rose-500/5 border-rose-500/20",
+
   }[tone];
   return (
     <div className={`rounded-xl border bg-gradient-to-br p-4 ${toneClass}`}>
@@ -324,103 +348,169 @@ function downloadPDF(title: string, rows: any[]) {
   doc.save(`${title.toLowerCase().replace(/\s+/g, "-")}.pdf`);
 }
 
-function Users({ usersQ, grantFn, revokeFn, qc }: any) {
+function Users({ usersQ, grantFn, revokeFn, blockFn, deleteFn, qc }: any) {
   const [filter, setFilter] = useState("");
-  const grantM = useMutation({
-    mutationFn: (v: any) => grantFn({ data: v }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
-  });
-  const revokeM = useMutation({
-    mutationFn: (v: any) => revokeFn({ data: v }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
-  });
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "blocked">("all");
+  const [minRatings, setMinRatings] = useState(0);
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-users"] });
+  const grantM = useMutation({ mutationFn: (v: any) => grantFn({ data: v }), onSuccess: invalidate });
+  const revokeM = useMutation({ mutationFn: (v: any) => revokeFn({ data: v }), onSuccess: invalidate });
+  const blockM = useMutation({ mutationFn: (v: any) => blockFn({ data: v }), onSuccess: invalidate });
+  const deleteM = useMutation({ mutationFn: (v: any) => deleteFn({ data: v }), onSuccess: invalidate });
 
   const filtered = useMemo(() => {
     const list = usersQ.data ?? [];
-    if (!filter) return list;
     const f = filter.toLowerCase();
-    return list.filter((u: any) =>
-      (u.displayName ?? "").toLowerCase().includes(f) || u.id.includes(f),
-    );
-  }, [usersQ.data, filter]);
+    return list.filter((u: any) => {
+      if (f && !(u.displayName ?? "").toLowerCase().includes(f) && !u.id.includes(f)) return false;
+      if (statusFilter === "active" && !u.active) return false;
+      if (statusFilter === "inactive" && u.active) return false;
+      if (statusFilter === "blocked" && !u.blocked) return false;
+      if (u.ratingsCount < minRatings) return false;
+      return true;
+    });
+  }, [usersQ.data, filter, statusFilter, minRatings]);
 
   const exportRows = useMemo(() => filtered.map((u: any) => ({
     nome: u.displayName ?? "",
     id: u.id,
-    cadastro: new Date(u.createdAt).toLocaleString("pt-BR"),
+    cadastro: u.createdAt ? new Date(u.createdAt).toLocaleString("pt-BR") : "",
+    ultimo_acesso: u.lastSeenAt ? new Date(u.lastSeenAt).toLocaleString("pt-BR") : "—",
+    status: u.blocked ? "Bloqueado" : u.active ? "Ativo" : "Inativo",
+    avaliacoes: u.ratingsCount,
+    nota_media: u.avgRating,
+    curtidas: u.likes,
+    assistidos: u.watched,
     papeis: u.roles.join(", "),
   })), [filtered]);
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-3 grid gap-2 md:grid-cols-[1fr,auto,auto,auto,auto]">
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filtrar por nome ou ID…"
-          className="flex-1 min-w-[200px] rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
+          className="rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as any)}
+          className="rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
+        >
+          <option value="all">Todos status</option>
+          <option value="active">Ativos</option>
+          <option value="inactive">Inativos</option>
+          <option value="blocked">Bloqueados</option>
+        </select>
+        <input
+          type="number"
+          min={0}
+          value={minRatings}
+          onChange={(e) => setMinRatings(Number(e.target.value) || 0)}
+          placeholder="Mín. avaliações"
+          className="w-32 rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
         />
         <button
           onClick={() => downloadCSV("usuarios.csv", exportRows)}
           className="rounded-md bg-secondary px-3 py-2 text-sm font-medium hover:bg-secondary/80"
-        >Exportar CSV</button>
+        >CSV</button>
         <button
           onClick={() => downloadPDF("Usuários StreamMatch", exportRows)}
           className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >Exportar PDF</button>
+        >PDF</button>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-border/60">
+      <div className="overflow-x-auto rounded-lg border border-border/60">
         <table className="w-full text-sm">
           <thead className="bg-secondary/40 text-left">
             <tr>
-              <th className="px-4 py-2">Usuário</th>
-              <th className="px-4 py-2">Cadastro</th>
-              <th className="px-4 py-2">Papéis</th>
-              <th className="px-4 py-2 text-right">Ações</th>
+              <th className="px-3 py-2">Usuário</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Cadastro</th>
+              <th className="px-3 py-2">Último acesso</th>
+              <th className="px-3 py-2 text-right">Aval.</th>
+              <th className="px-3 py-2 text-right">Nota</th>
+              <th className="px-3 py-2 text-right">👍/👎/✅</th>
+              <th className="px-3 py-2">Papéis</th>
+              <th className="px-3 py-2 text-right">Ações</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((u: any) => (
-              <tr key={u.id} className="border-t border-border/40">
-                <td className="px-4 py-3">
+              <tr key={u.id} className="border-t border-border/40 align-top">
+                <td className="px-3 py-2">
                   <div className="font-medium">{u.displayName || "(sem nome)"}</div>
-                  <div className="text-xs text-muted-foreground">{u.id}</div>
+                  <div className="text-[10px] text-muted-foreground">{u.id}</div>
                 </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  {new Date(u.createdAt).toLocaleDateString("pt-BR")}
-                </td>
-                <td className="px-4 py-3">
-                  {u.roles.length === 0 ? (
-                    <span className="text-muted-foreground">—</span>
+                <td className="px-3 py-2">
+                  {u.blocked ? (
+                    <span className="rounded bg-rose-500/15 px-2 py-0.5 text-xs text-rose-400">Bloqueado</span>
+                  ) : u.active ? (
+                    <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-400">Ativo</span>
                   ) : (
-                    <div className="flex flex-wrap gap-1">
-                      {u.roles.map((r: string) => (
-                        <span key={r} className="rounded bg-primary/15 px-2 py-0.5 text-xs text-primary">{r}</span>
-                      ))}
-                    </div>
+                    <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">Inativo</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="inline-flex gap-1">
-                    {ROLES.map((r) => {
-                      const has = u.roles.includes(r);
-                      return (
-                        <button
-                          key={r}
-                          onClick={async () => {
-                            try {
-                              if (has) await revokeM.mutateAsync({ userId: u.id, role: r });
-                              else await grantM.mutateAsync({ userId: u.id, role: r });
-                            } catch (e: any) { alert(e.message); }
-                          }}
-                          className={`rounded px-2 py-1 text-xs font-medium ${
-                            has ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:bg-secondary/80"
-                          }`}
-                        >{has ? `− ${r}` : `+ ${r}`}</button>
-                      );
-                    })}
+                <td className="px-3 py-2 text-muted-foreground text-xs">
+                  {new Date(u.createdAt).toLocaleDateString("pt-BR")}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground text-xs">
+                  {u.lastSeenAt ? new Date(u.lastSeenAt).toLocaleDateString("pt-BR") : "—"}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums">{u.ratingsCount}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{u.avgRating || "—"}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-xs">
+                  {u.likes}/{u.dislikes}/{u.watched}
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex flex-wrap gap-1">
+                    {u.roles.length === 0 ? (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    ) : u.roles.map((r: string) => (
+                      <span key={r} className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">{r}</span>
+                    ))}
                   </div>
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <details className="inline-block">
+                    <summary className="cursor-pointer rounded bg-secondary px-2 py-1 text-xs hover:bg-secondary/80">⋯</summary>
+                    <div className="mt-1 flex flex-col items-stretch gap-1 rounded-md border border-border/60 bg-popover p-2 text-xs shadow-lg">
+                      {ROLES.map((r) => {
+                        const has = u.roles.includes(r);
+                        return (
+                          <button
+                            key={r}
+                            onClick={async () => {
+                              try {
+                                if (has) await revokeM.mutateAsync({ userId: u.id, role: r });
+                                else await grantM.mutateAsync({ userId: u.id, role: r });
+                              } catch (e: any) { alert(e.message); }
+                            }}
+                            className={`rounded px-2 py-1 text-left ${has ? "bg-primary/15 text-primary" : "hover:bg-secondary"}`}
+                          >{has ? `Remover ${r}` : `Tornar ${r}`}</button>
+                        );
+                      })}
+                      <hr className="my-1 border-border/40" />
+                      <button
+                        onClick={async () => {
+                          const reason = u.blocked ? undefined : prompt("Motivo do bloqueio:") ?? undefined;
+                          try { await blockM.mutateAsync({ userId: u.id, block: !u.blocked, reason }); }
+                          catch (e: any) { alert(e.message); }
+                        }}
+                        className="rounded px-2 py-1 text-left text-amber-400 hover:bg-amber-500/10"
+                      >{u.blocked ? "Desbloquear" : "Bloquear"}</button>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Excluir permanentemente ${u.displayName || u.id}?`)) return;
+                          try { await deleteM.mutateAsync({ userId: u.id }); }
+                          catch (e: any) { alert(e.message); }
+                        }}
+                        className="rounded px-2 py-1 text-left text-rose-400 hover:bg-rose-500/10"
+                      >Excluir conta</button>
+                    </div>
+                  </details>
                 </td>
               </tr>
             ))}
@@ -434,3 +524,144 @@ function Users({ usersQ, grantFn, revokeFn, qc }: any) {
     </div>
   );
 }
+
+function Retention({ q }: { q: any }) {
+  if (q.isLoading) return <div className="text-muted-foreground">Carregando…</div>;
+  if (q.error) return <div className="text-destructive">Erro: {(q.error as Error).message}</div>;
+  if (!q.data) return null;
+  const items: { label: string; data: any }[] = [
+    { label: "1 dia", data: q.data.d1 },
+    { label: "7 dias", data: q.data.d7 },
+    { label: "30 dias", data: q.data.d30 },
+    { label: "90 dias", data: q.data.d90 },
+  ];
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {items.map((it) => (
+          <Kpi key={it.label} icon="🔁" label={`Retenção ${it.label}`} value={`${it.data.rate}%`} tone="good" />
+        ))}
+      </div>
+      <div className="mt-4 rounded-lg border border-border/60 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-secondary/40 text-left">
+            <tr><th className="px-4 py-2">Janela</th><th className="px-4 py-2 text-right">Elegíveis</th><th className="px-4 py-2 text-right">Retidos</th><th className="px-4 py-2 text-right">Taxa</th></tr>
+          </thead>
+          <tbody>
+            {items.map((it) => (
+              <tr key={it.label} className="border-t border-border/40">
+                <td className="px-4 py-2">{it.label}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{it.data.eligible}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{it.data.retained}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{it.data.rate}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Retenção = usuários cadastrados há mais que N dias que tiveram atividade nos últimos N dias.
+      </p>
+    </>
+  );
+}
+
+function Logs({ q }: { q: any }) {
+  if (q.isLoading) return <div className="text-muted-foreground">Carregando…</div>;
+  if (q.error) return <div className="text-destructive">Erro: {(q.error as Error).message}</div>;
+  const rows = q.data ?? [];
+  const exportRows = rows.map((r: any) => ({
+    data: new Date(r.created_at).toLocaleString("pt-BR"),
+    categoria: r.category,
+    nivel: r.level,
+    mensagem: r.message,
+    user_id: r.user_id ?? "",
+  }));
+  return (
+    <div>
+      <div className="mb-3 flex justify-end gap-2">
+        <button onClick={() => downloadCSV("logs.csv", exportRows)} className="rounded-md bg-secondary px-3 py-2 text-sm">CSV</button>
+        <button onClick={() => downloadPDF("Logs do Sistema", exportRows)} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">PDF</button>
+      </div>
+      <div className="overflow-x-auto rounded-lg border border-border/60">
+        <table className="w-full text-sm">
+          <thead className="bg-secondary/40 text-left">
+            <tr><th className="px-3 py-2">Data</th><th className="px-3 py-2">Nível</th><th className="px-3 py-2">Categoria</th><th className="px-3 py-2">Mensagem</th><th className="px-3 py-2">Usuário</th></tr>
+          </thead>
+          <tbody>
+            {rows.map((r: any) => (
+              <tr key={r.id} className="border-t border-border/40 align-top">
+                <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{new Date(r.created_at).toLocaleString("pt-BR")}</td>
+                <td className="px-3 py-2">
+                  <span className={`rounded px-2 py-0.5 text-xs ${
+                    r.level === "error" ? "bg-rose-500/15 text-rose-400"
+                    : r.level === "warn" ? "bg-amber-500/15 text-amber-400"
+                    : "bg-primary/15 text-primary"
+                  }`}>{r.level}</span>
+                </td>
+                <td className="px-3 py-2 text-xs">{r.category}</td>
+                <td className="px-3 py-2">{r.message}</td>
+                <td className="px-3 py-2 text-[10px] text-muted-foreground">{r.user_id ?? "—"}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Nenhum log registrado ainda.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+const SETTING_META: Record<string, { label: string; help: string; min?: number; max?: number; step?: number }> = {
+  min_ratings_for_recs: { label: "Mínimo de avaliações para gerar recomendações", help: "Quantos conteúdos o usuário precisa avaliar antes de receber recomendações.", min: 1, max: 20 },
+  recs_to_generate: { label: "Quantidade de recomendações por sessão", help: "Quantos itens são sugeridos por vez.", min: 5, max: 100 },
+  weight_like: { label: "Peso de Curtida", help: "Impacto positivo de uma curtida no algoritmo.", step: 0.1 },
+  weight_watched: { label: "Peso de Assistido", help: "Impacto positivo de marcar como assistido.", step: 0.1 },
+  weight_dislike: { label: "Peso de Rejeição", help: "Impacto negativo de uma rejeição (use valor negativo).", step: 0.1 },
+};
+
+function Settings({ q, update, qc }: any) {
+  const updateM = useMutation({
+    mutationFn: (v: { key: string; value: unknown }) => update({ data: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-settings"] }),
+  });
+  if (q.isLoading) return <div className="text-muted-foreground">Carregando…</div>;
+  if (q.error) return <div className="text-destructive">Erro: {(q.error as Error).message}</div>;
+  const settings = q.data ?? {};
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {Object.entries(SETTING_META).map(([key, meta]) => {
+        const value = settings[key];
+        return (
+          <div key={key} className="rounded-lg border border-border/60 bg-card/40 p-4">
+            <label className="block text-sm font-semibold">{meta.label}</label>
+            <p className="mt-1 text-xs text-muted-foreground">{meta.help}</p>
+            <div className="mt-2 flex gap-2">
+              <input
+                type="number"
+                defaultValue={Number(value ?? 0)}
+                min={meta.min}
+                max={meta.max}
+                step={meta.step ?? 1}
+                onBlur={async (e) => {
+                  const next = Number(e.target.value);
+                  if (Number.isNaN(next) || next === Number(value)) return;
+                  try { await updateM.mutateAsync({ key, value: next }); }
+                  catch (err: any) { alert(err.message); }
+                }}
+                className="w-32 rounded-md border border-border/60 bg-background px-3 py-2 text-sm tabular-nums"
+              />
+              <span className="self-center text-xs text-muted-foreground">atual: {String(value ?? "—")}</span>
+            </div>
+          </div>
+        );
+      })}
+      <p className="md:col-span-2 mt-2 text-xs text-muted-foreground">
+        Alterações são salvas ao sair do campo. Os pesos influenciam o algoritmo de recomendação.
+      </p>
+    </div>
+  );
+}
+
