@@ -420,7 +420,7 @@ export const logEvent = createServerFn({ method: "POST" })
       category: data.category,
       level: data.level ?? "info",
       message: data.message,
-      metadata: data.metadata ?? {},
+      metadata: (data.metadata ?? {}) as never,
     });
     if (error) throw new Error(error.message);
     return { ok: true };
