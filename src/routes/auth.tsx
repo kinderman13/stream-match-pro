@@ -128,6 +128,37 @@ function AuthPage() {
             Entrar com Google
           </button>
           <button
+            type="button"
+            disabled={busy}
+            onClick={() => setGuestOpen(true)}
+            className="mt-2 w-full rounded-md border border-border bg-card py-2.5 text-sm font-semibold hover:bg-accent disabled:opacity-60"
+          >
+            Entrar como visitante
+          </button>
+
+          <AlertDialog open={guestOpen} onOpenChange={setGuestOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Entrar como visitante</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Neste modo o seu perfil e os itens sugeridos não serão salvos.
+                  Deseja continuar mesmo assim?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="bg-white text-black hover:bg-white/90">
+                  Voltar
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={enterAsGuest}
+                  className="bg-green-600 text-white hover:bg-green-700"
+                >
+                  Concordo, continuar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <button
             onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
             className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground"
           >
