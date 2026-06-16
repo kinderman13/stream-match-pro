@@ -79,6 +79,24 @@ function Onboarding() {
     } catch (e) { console.error(e); }
     setTimeout(() => { setIdx((i) => i + 1); setExiting(null); setBusy(false); }, 250);
   }
+  async function handleWatched() {
+    if (!current || busy) return;
+    setBusy(true);
+    const rating = ratingValue;
+    // weight per spec: 9-10 extreme, 7-8 high, 5-6 neutral, 3-4 low, 0-2 extreme negative
+    const weight = rating >= 9 ? 1.5 : rating >= 7 ? 1.2 : rating >= 5 ? 1.0 : rating >= 3 ? 0.7 : 0.4;
+    try {
+      await skip({ data: { tmdbId: current.id, mediaType: current.media_type, action: "watched" } });
+      await rate({ data: { tmdbId: current.id, mediaType: current.media_type, rating, source: "onboarding", title: current.title, posterPath: current.poster_path } });
+      // weight is computed server-side currently; rating itself carries the signal.
+      void weight;
+      setCount((c) => c + 1);
+    } catch (e) { console.error(e); }
+    setRatingOpen(false);
+    setExiting("like");
+    setTimeout(() => { setIdx((i) => i + 1); setExiting(null); setBusy(false); }, 250);
+  }
+
 
   async function handlePass(action: "dislike" | "skip" = "skip") {
     if (!current || busy) return;
