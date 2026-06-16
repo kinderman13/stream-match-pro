@@ -1,71 +1,82 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { tmdbOnboardingFeed, tmdbSearch } from "@/lib/tmdb.functions";
-import { upsertRating, completeOnboarding, getUserState } from "@/lib/user-data.functions";
-import { MediaCard } from "@/components/MediaCard";
-import { RatingDialog } from "@/components/RatingDialog";
+import { tmdbOnboardingFeed } from "@/lib/tmdb.functions";
+import { upsertRating, completeOnboarding, getUserState, addInteraction } from "@/lib/user-data.functions";
+import { Heart, X, Star } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   component: Onboarding,
 });
 
-type Item = { id: number; media_type: "movie" | "tv"; title: string; poster_path: string | null; year: string; vote_average: number };
+type Item = {
+  id: number;
+  media_type: "movie" | "tv";
+  title: string;
+  poster_path: string | null;
+  backdrop_path?: string | null;
+  year: string;
+  vote_average: number;
+  overview?: string;
+};
 
 function Onboarding() {
   const router = useRouter();
   const feed = useServerFn(tmdbOnboardingFeed);
-  const search = useServerFn(tmdbSearch);
   const rate = useServerFn(upsertRating);
+  const skip = useServerFn(addInteraction);
   const complete = useServerFn(completeOnboarding);
   const state = useServerFn(getUserState);
 
   const [items, setItems] = useState<Item[]>([]);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [idx, setIdx] = useState(0);
   const [count, setCount] = useState(0);
-  const [q, setQ] = useState("");
-  const [target, setTarget] = useState<Item | null>(null);
-  const [selected, setSelected] = useState<Record<string, number>>({});
-  const sentinel = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [drag, setDrag] = useState<{ x: number; y: number; startX: number; startY: number } | null>(null);
+  const [exiting, setExiting] = useState<"like" | "pass" | null>(null);
 
   useEffect(() => {
     state({}).then((s) => setCount(s.ratingsCount));
-    loadMore(1, true);
+    load(1, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadMore(p = page, reset = false) {
-    if (loading) return;
-    setLoading(true);
+  async function load(p: number, reset = false) {
     try {
-      const r = await feed({ data: { page: p } });
-      setItems((prev) => reset ? r : [...prev, ...r]);
+      const r = (await feed({ data: { page: p } })) as Item[];
+      setItems((prev) => (reset ? r : [...prev, ...r]));
       setPage(p + 1);
     } catch (e) { console.error(e); }
-    finally { setLoading(false); }
   }
 
   useEffect(() => {
-    const el = sentinel.current; if (!el) return;
-    const io = new IntersectionObserver((ents) => { if (ents[0].isIntersecting && !q) loadMore(); }, { rootMargin: "400px" });
-    io.observe(el); return () => io.disconnect();
-  }, [page, loading, q]);
+    if (items.length - idx <= 3) load(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idx]);
 
-  async function runSearch(query: string) {
-    setQ(query);
-    if (!query.trim()) { loadMore(1, true); return; }
-    const r = await search({ data: { query } });
-    setItems(r as Item[]);
+  const current = items[idx];
+  const next = items[idx + 1];
+
+  async function handleLike() {
+    if (!current || busy) return;
+    setBusy(true);
+    setExiting("like");
+    try {
+      await rate({ data: { tmdbId: current.id, mediaType: current.media_type, rating: 9, source: "onboarding", title: current.title, posterPath: current.poster_path } });
+      setCount((c) => c + 1);
+    } catch (e) { console.error(e); }
+    setTimeout(() => { setIdx((i) => i + 1); setExiting(null); setBusy(false); }, 250);
   }
 
-  async function saveRating(rating: number) {
-    if (!target) return;
-    const key = `${target.media_type}:${target.id}`;
-    await rate({ data: { tmdbId: target.id, mediaType: target.media_type, rating, source: "onboarding", title: target.title, posterPath: target.poster_path } });
-    setSelected((s) => ({ ...s, [key]: rating }));
-    setCount((c) => (selected[key] !== undefined ? c : c + 1));
-    setTarget(null);
+  async function handlePass() {
+    if (!current || busy) return;
+    setBusy(true);
+    setExiting("pass");
+    try {
+      await skip({ data: { tmdbId: current.id, mediaType: current.media_type, action: "skip" } });
+    } catch (e) { console.error(e); }
+    setTimeout(() => { setIdx((i) => i + 1); setExiting(null); setBusy(false); }, 250);
   }
 
   async function finish() {
@@ -74,72 +85,156 @@ function Onboarding() {
     router.navigate({ to: "/providers" });
   }
 
+  // Drag handlers
+  function onPointerDown(e: React.PointerEvent) {
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    setDrag({ x: 0, y: 0, startX: e.clientX, startY: e.clientY });
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (!drag) return;
+    setDrag({ ...drag, x: e.clientX - drag.startX, y: e.clientY - drag.startY });
+  }
+  function onPointerUp() {
+    if (!drag) return;
+    const dx = drag.x;
+    setDrag(null);
+    if (dx > 120) handleLike();
+    else if (dx < -120) handlePass();
+  }
+
+  const dx = drag?.x ?? 0;
+  const dy = drag?.y ?? 0;
+  const rot = dx / 20;
+  const likeOpacity = Math.min(1, Math.max(0, dx / 120));
+  const passOpacity = Math.min(1, Math.max(0, -dx / 120));
+
+  const transform = exiting === "like"
+    ? "translate(120%, -10%) rotate(20deg)"
+    : exiting === "pass"
+    ? "translate(-120%, -10%) rotate(-20deg)"
+    : `translate(${dx}px, ${dy}px) rotate(${rot}deg)`;
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 pb-32">
-      <h1 className="text-2xl font-bold">Vamos conhecer seu gosto</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Selecione pelo menos <strong className="text-foreground">10 títulos</strong> que você ama e dê uma nota de 0 a 10.
-      </p>
+    <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-xl flex-col px-4 py-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Os mais assistidos</h1>
+          <p className="text-xs text-muted-foreground">Deslize ou toque no coração nos que você curtiu.</p>
+        </div>
+        <div className="text-right text-sm">
+          <div className={count >= 10 ? "text-2xl font-black text-success" : "text-2xl font-black text-primary"}>{count}</div>
+          <div className="text-xs text-muted-foreground">/ 10</div>
+        </div>
+      </div>
 
-      <div className="sticky top-14 z-30 -mx-4 mt-4 border-b border-border bg-background/90 px-4 py-3 backdrop-blur">
-        <div className="flex items-center gap-3">
-          <input
-            value={q}
-            onChange={(e) => runSearch(e.target.value)}
-            placeholder="Buscar (opcional)..."
-            className="w-full max-w-xs rounded-md border border-border bg-input px-3 py-2 text-sm outline-none focus:border-primary"
+      <div className="relative mx-auto mt-6 aspect-[2/3] w-full max-w-sm flex-1">
+        {!current && (
+          <div className="flex h-full items-center justify-center rounded-2xl border border-border bg-card text-sm text-muted-foreground">
+            Carregando títulos...
+          </div>
+        )}
+
+        {next && (
+          <Card item={next} style={{ transform: "scale(0.95) translateY(12px)", opacity: 0.7 }} />
+        )}
+
+        {current && (
+          <Card
+            item={current}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            style={{
+              transform,
+              transition: drag ? "none" : "transform 250ms ease-out",
+              touchAction: "none",
+              cursor: drag ? "grabbing" : "grab",
+            }}
+            overlay={
+              <>
+                <div className="pointer-events-none absolute left-4 top-4 rotate-[-12deg] rounded-md border-4 border-success px-3 py-1 text-2xl font-black text-success" style={{ opacity: likeOpacity }}>
+                  GOSTEI
+                </div>
+                <div className="pointer-events-none absolute right-4 top-4 rotate-[12deg] rounded-md border-4 border-destructive px-3 py-1 text-2xl font-black text-destructive" style={{ opacity: passOpacity }}>
+                  PASSAR
+                </div>
+              </>
+            }
           />
-          <div className="ml-auto text-sm">
-            <span className="text-muted-foreground">Selecionados: </span>
-            <span className={count >= 10 ? "font-bold text-success" : "font-bold text-primary"}>{count}</span>
-            <span className="text-muted-foreground"> / 10</span>
-          </div>
+        )}
+      </div>
+
+      <div className="mt-6 flex items-center justify-center gap-6">
+        <button
+          onClick={handlePass}
+          disabled={!current || busy}
+          aria-label="Passar"
+          className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-destructive bg-card text-destructive shadow-lg transition hover:scale-110 disabled:opacity-40"
+        >
+          <X className="h-7 w-7" />
+        </button>
+        <button
+          onClick={handleLike}
+          disabled={!current || busy}
+          aria-label="Gostei"
+          className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-rose-600 text-white shadow-xl transition hover:scale-110 disabled:opacity-40"
+        >
+          <Heart className="h-8 w-8" fill="currentColor" />
+        </button>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between">
+        <div className="text-xs text-muted-foreground">
+          {count < 10 ? `Faltam ${10 - count} para continuar` : "Pronto para avançar!"}
         </div>
+        <button
+          disabled={count < 10}
+          onClick={finish}
+          className="rounded-md bg-primary px-5 py-2 text-sm font-bold text-primary-foreground disabled:opacity-40"
+        >
+          Continuar
+        </button>
       </div>
+    </div>
+  );
+}
 
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-        {items.map((it) => {
-          const k = `${it.media_type}:${it.id}`;
-          return (
-            <MediaCard
-              key={k}
-              posterPath={it.poster_path}
-              title={it.title}
-              year={it.year}
-              voteAverage={it.vote_average}
-              selected={selected[k] !== undefined}
-              badge={selected[k] !== undefined ? `${selected[k]}` : undefined}
-              onClick={() => setTarget(it)}
-            />
-          );
-        })}
-      </div>
-
-      <div ref={sentinel} className="h-10" />
-      {loading && <div className="py-4 text-center text-sm text-muted-foreground">Carregando...</div>}
-
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-          <div className="text-xs text-muted-foreground">
-            {count < 10 ? `Faltam ${10 - count} para continuar` : "Pronto para avançar!"}
-          </div>
-          <button
-            disabled={count < 10}
-            onClick={finish}
-            className="rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-40"
-          >
-            Continuar
-          </button>
+function Card({
+  item,
+  style,
+  overlay,
+  ...handlers
+}: {
+  item: Item;
+  style?: React.CSSProperties;
+  overlay?: React.ReactNode;
+} & React.HTMLAttributes<HTMLDivElement>) {
+  const bg = item.backdrop_path || item.poster_path;
+  const src = bg ? `https://image.tmdb.org/t/p/w780${bg}` : null;
+  return (
+    <div
+      {...handlers}
+      style={style}
+      className="absolute inset-0 select-none overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+    >
+      {src ? (
+        <img src={src} alt={item.title} draggable={false} className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-secondary text-muted-foreground">{item.title}</div>
+      )}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-4 text-white">
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wide opacity-80">
+          <span className="rounded bg-white/20 px-1.5 py-0.5">{item.media_type === "movie" ? "Filme" : "Série"}</span>
+          {item.year && <span>{item.year}</span>}
+          <span className="ml-auto flex items-center gap-1">
+            <Star className="h-3 w-3" fill="currentColor" /> {item.vote_average.toFixed(1)}
+          </span>
         </div>
+        <div className="mt-1 text-xl font-bold leading-tight">{item.title}</div>
+        {item.overview && <p className="mt-1 line-clamp-2 text-xs opacity-80">{item.overview}</p>}
       </div>
-
-      <RatingDialog
-        open={!!target}
-        title={target?.title || ""}
-        initial={target ? selected[`${target.media_type}:${target.id}`] ?? 8 : 8}
-        onClose={() => setTarget(null)}
-        onSubmit={saveRating}
-      />
+      {overlay}
     </div>
   );
 }
