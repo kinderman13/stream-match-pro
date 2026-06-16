@@ -83,7 +83,7 @@ function Onboarding() {
   }
 
   async function finish() {
-    if (count < 10) return;
+    if (count < 3) return;
     await complete({});
     router.navigate({ to: "/providers" });
   }
