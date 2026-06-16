@@ -28,7 +28,12 @@ function Recs() {
   async function load(surprise = false) {
     setLoading(true);
     try {
-      const r = (await recsFn({ data: { mediaType: "all", limit: 10, surprise } })) as Rec[];
+      let mt: "movie" | "tv" | "all" = "all";
+      try {
+        const v = sessionStorage.getItem("streammatch:contentType");
+        if (v === "movie" || v === "tv") mt = v;
+      } catch {}
+      const r = (await recsFn({ data: { mediaType: mt, limit: 10, surprise } })) as Rec[];
       setItems(r);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
