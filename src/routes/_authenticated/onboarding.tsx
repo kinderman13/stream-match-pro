@@ -94,7 +94,7 @@ function Onboarding() {
   async function finish() {
     if (count < 3) return;
     await complete({});
-    router.navigate({ to: "/choose" });
+    router.navigate({ to: "/recommendations" });
   }
 
 
