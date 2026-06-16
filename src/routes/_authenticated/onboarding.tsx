@@ -241,37 +241,41 @@ function Onboarding() {
       </div>
 
       {ratingOpen && current && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !busy && setRatingOpen(false)}>
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="text-sm text-muted-foreground">Você assistiu</div>
-            <div className="text-lg font-bold">{current.title}</div>
-            <div className="mt-4 text-sm">Qual nota você daria?</div>
-            <div className="mt-3 text-center text-5xl font-black text-primary">{ratingValue}</div>
-            <input
-              type="range"
-              min={0}
-              max={10}
-              step={1}
-              value={ratingValue}
-              onChange={(e) => setRatingValue(Number(e.target.value))}
-              className="mt-2 w-full"
-            />
-            <div className="mt-1 flex justify-between text-[10px] text-muted-foreground"><span>0</span><span>5</span><span>10</span></div>
-            <div className="mt-5 flex gap-2">
-              <button
-                disabled={busy}
-                onClick={() => setRatingOpen(false)}
-                className="flex-1 rounded-md border border-border bg-secondary px-3 py-2 text-sm font-semibold disabled:opacity-40"
-              >Cancelar</button>
-              <button
-                disabled={busy}
-                onClick={handleWatched}
-                className="flex-1 rounded-md bg-primary px-3 py-2 text-sm font-bold text-primary-foreground disabled:opacity-40"
-              >Salvar nota</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <div className="text-sm text-muted-foreground">
+              {ratingAction === "watched" ? "Você assistiu" : "Você gostou de"}
             </div>
+            <div className="text-lg font-bold">{current.title}</div>
+            <div className="mt-4 text-sm font-semibold">Qual nota você daria para este conteúdo?</div>
+            <div className="mt-1 text-xs text-muted-foreground">A nota é obrigatória.</div>
+            <div className="mt-4 grid grid-cols-6 gap-2">
+              {Array.from({ length: 11 }, (_, n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setRatingValue(n)}
+                  className={`h-10 rounded-md border text-sm font-bold transition ${
+                    ratingValue === n
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-secondary text-foreground hover:border-primary/60"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <button
+              disabled={busy || ratingValue === null}
+              onClick={confirmRating}
+              className="mt-5 w-full rounded-md bg-primary px-3 py-3 text-sm font-bold text-primary-foreground disabled:opacity-40"
+            >
+              {ratingValue === null ? "Escolha uma nota" : "Salvar nota e avançar"}
+            </button>
           </div>
         </div>
       )}
+
 
 
       <div className="mt-4 flex flex-col items-center gap-2">
