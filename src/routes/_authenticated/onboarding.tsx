@@ -83,7 +83,7 @@ function Onboarding() {
   }
 
   async function finish() {
-    if (count < 10) return;
+    if (count < 3) return;
     await complete({});
     router.navigate({ to: "/providers" });
   }
@@ -125,8 +125,8 @@ function Onboarding() {
           <p className="text-xs text-muted-foreground">Deslize ou toque no coração nos que você curtiu.</p>
         </div>
         <div className="text-right text-sm">
-          <div className={count >= 10 ? "text-2xl font-black text-success" : "text-2xl font-black text-primary"}>{count}</div>
-          <div className="text-xs text-muted-foreground">/ 10</div>
+          <div className={count >= 3 ? "text-2xl font-black text-success" : "text-2xl font-black text-primary"}>{count}</div>
+          <div className="text-xs text-muted-foreground">/ 3</div>
         </div>
       </div>
 
@@ -205,10 +205,10 @@ function Onboarding() {
 
       <div className="mt-4 flex items-center justify-between">
         <div className="text-xs text-muted-foreground">
-          {count < 10 ? `Faltam ${10 - count} para continuar` : "Pronto para avançar!"}
+          {count < 3 ? `Faltam ${3 - count} para continuar` : "Pronto para avançar!"}
         </div>
         <button
-          disabled={count < 10}
+          disabled={count < 3}
           onClick={finish}
           className="rounded-md bg-primary px-5 py-2 text-sm font-bold text-primary-foreground disabled:opacity-40"
         >
