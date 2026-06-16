@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { tmdbOnboardingFeed } from "@/lib/tmdb.functions";
 import { upsertRating, completeOnboarding, getUserState, addInteraction } from "@/lib/user-data.functions";
-import { Heart, X, Star } from "lucide-react";
+import { Heart, Star, ThumbsDown, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   component: Onboarding,
@@ -69,12 +69,15 @@ function Onboarding() {
     setTimeout(() => { setIdx((i) => i + 1); setExiting(null); setBusy(false); }, 250);
   }
 
-  async function handlePass() {
+  async function handlePass(action: "dislike" | "skip" = "skip") {
     if (!current || busy) return;
     setBusy(true);
     setExiting("pass");
     try {
-      await skip({ data: { tmdbId: current.id, mediaType: current.media_type, action: "skip" } });
+      await skip({ data: { tmdbId: current.id, mediaType: current.media_type, action } });
+      if (action === "dislike") {
+        await rate({ data: { tmdbId: current.id, mediaType: current.media_type, rating: 2, source: "onboarding", title: current.title, posterPath: current.poster_path } });
+      }
     } catch (e) { console.error(e); }
     setTimeout(() => { setIdx((i) => i + 1); setExiting(null); setBusy(false); }, 250);
   }
@@ -165,23 +168,39 @@ function Onboarding() {
         )}
       </div>
 
-      <div className="mt-6 flex items-center justify-center gap-6">
+      <div className="mt-6 flex items-center justify-center gap-4">
         <button
-          onClick={handlePass}
+          onClick={() => handlePass("dislike")}
           disabled={!current || busy}
-          aria-label="Passar"
+          aria-label="Não gostei"
+          title="Não gostei"
           className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-destructive bg-card text-destructive shadow-lg transition hover:scale-110 disabled:opacity-40"
         >
-          <X className="h-7 w-7" />
+          <ThumbsDown className="h-6 w-6" />
+        </button>
+        <button
+          onClick={() => handlePass("skip")}
+          disabled={!current || busy}
+          aria-label="Não assisti"
+          title="Não assisti"
+          className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-border bg-card text-muted-foreground shadow-lg transition hover:scale-110 hover:text-foreground disabled:opacity-40"
+        >
+          <EyeOff className="h-6 w-6" />
         </button>
         <button
           onClick={handleLike}
           disabled={!current || busy}
           aria-label="Gostei"
+          title="Gostei"
           className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-rose-600 text-white shadow-xl transition hover:scale-110 disabled:opacity-40"
         >
-          <Heart className="h-8 w-8" fill="currentColor" />
+          <Heart className="h-7 w-7" fill="currentColor" />
         </button>
+      </div>
+      <div className="mt-2 flex items-center justify-center gap-4 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <span className="w-14 text-center">Não gostei</span>
+        <span className="w-14 text-center">Não assisti</span>
+        <span className="w-16 text-center">Gostei</span>
       </div>
 
       <div className="mt-4 flex items-center justify-between">
