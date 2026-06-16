@@ -2,7 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { tmdbOnboardingFeed } from "@/lib/tmdb.functions";
-import { upsertRating, completeOnboarding, getUserState, addInteraction } from "@/lib/user-data.functions";
+import { upsertRating, completeOnboarding, addInteraction } from "@/lib/user-data.functions";
 import { Heart, Star, ThumbsDown, HelpCircle, Eye } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
@@ -26,7 +26,7 @@ function Onboarding() {
   const rate = useServerFn(upsertRating);
   const skip = useServerFn(addInteraction);
   const complete = useServerFn(completeOnboarding);
-  const state = useServerFn(getUserState);
+  
 
   const [items, setItems] = useState<Item[]>([]);
   const [page, setPage] = useState(1);
@@ -48,7 +48,7 @@ function Onboarding() {
     } catch {}
     if (!mt) { router.navigate({ to: "/choose" }); return; }
     setMediaType(mt);
-    state({}).then((s) => setCount(s.ratingsCount));
+    setCount(0);
     load(1, true, mt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
