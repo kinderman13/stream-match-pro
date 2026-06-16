@@ -127,7 +127,7 @@ function Onboarding() {
     if (!drag) return;
     const dx = drag.x;
     setDrag(null);
-    if (dx > 120) handleLike();
+    if (dx > 120) openRating("like");
     else if (dx < -120) handlePass();
   }
 
