@@ -36,14 +36,7 @@ function AuthPage() {
   }
 
   async function routeAfterAuth() {
-    try {
-      const s = await fetchState({});
-      if (!s.selectedProviders || s.selectedProviders.length === 0) router.navigate({ to: "/providers" });
-      else if (!s.onboardingCompleted) router.navigate({ to: "/onboarding" });
-      else router.navigate({ to: "/choose" });
-    } catch {
-      router.navigate({ to: "/providers" });
-    }
+    router.navigate({ to: "/providers" });
   }
 
 
