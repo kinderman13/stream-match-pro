@@ -28,26 +28,71 @@ export const adminListUsers = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: profiles, error } = await supabaseAdmin
-      .from("profiles")
-      .select("id,display_name,created_at")
-      .order("created_at", { ascending: false })
-      .limit(200);
-    if (error) throw new Error(error.message);
-    const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id,role");
+
+    const [profilesRes, rolesRes, ratingsRes, interactionsRes, prefsRes] = await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("id, display_name, created_at, last_seen_at, blocked_at, blocked_reason")
+        .order("created_at", { ascending: false })
+        .limit(500),
+      supabaseAdmin.from("user_roles").select("user_id, role"),
+      supabaseAdmin.from("ratings").select("user_id, rating"),
+      supabaseAdmin.from("interactions").select("user_id, action"),
+      supabaseAdmin.from("user_preferences").select("user_id, selected_providers"),
+    ]);
+    if (profilesRes.error) throw new Error(profilesRes.error.message);
+
     const rolesByUser = new Map<string, string[]>();
-    for (const r of roles ?? []) {
+    for (const r of rolesRes.data ?? []) {
       const list = rolesByUser.get(r.user_id) ?? [];
       list.push(r.role);
       rolesByUser.set(r.user_id, list);
     }
-    return (profiles ?? []).map((p) => ({
-      id: p.id,
-      displayName: p.display_name,
-      createdAt: p.created_at,
-      roles: rolesByUser.get(p.id) ?? [],
-    }));
+    const ratingsByUser = new Map<string, { count: number; avg: number }>();
+    for (const r of ratingsRes.data ?? []) {
+      const prev = ratingsByUser.get(r.user_id) ?? { count: 0, avg: 0 };
+      prev.avg = (prev.avg * prev.count + Number(r.rating)) / (prev.count + 1);
+      prev.count += 1;
+      ratingsByUser.set(r.user_id, prev);
+    }
+    const actsByUser = new Map<string, { likes: number; dislikes: number; watched: number }>();
+    for (const i of interactionsRes.data ?? []) {
+      const prev = actsByUser.get(i.user_id) ?? { likes: 0, dislikes: 0, watched: 0 };
+      if (i.action === "like") prev.likes++;
+      else if (i.action === "dislike") prev.dislikes++;
+      else if (i.action === "watched") prev.watched++;
+      actsByUser.set(i.user_id, prev);
+    }
+    const prefsByUser = new Map<string, number[]>();
+    for (const p of prefsRes.data ?? []) {
+      prefsByUser.set(p.user_id, p.selected_providers ?? []);
+    }
+
+    const now = Date.now();
+    return (profilesRes.data ?? []).map((p) => {
+      const acts = actsByUser.get(p.id) ?? { likes: 0, dislikes: 0, watched: 0 };
+      const r = ratingsByUser.get(p.id);
+      const lastSeen = p.last_seen_at ? new Date(p.last_seen_at).getTime() : 0;
+      const active = lastSeen > 0 && now - lastSeen < 30 * 86400_000;
+      return {
+        id: p.id,
+        displayName: p.display_name,
+        createdAt: p.created_at,
+        lastSeenAt: p.last_seen_at,
+        blocked: !!p.blocked_at,
+        blockedReason: p.blocked_reason,
+        active,
+        ratingsCount: r?.count ?? 0,
+        avgRating: r ? Math.round(r.avg * 100) / 100 : 0,
+        likes: acts.likes,
+        dislikes: acts.dislikes,
+        watched: acts.watched,
+        providers: prefsByUser.get(p.id) ?? [],
+        roles: rolesByUser.get(p.id) ?? [],
+      };
+    });
   });
+
 
 export const adminGrantRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
