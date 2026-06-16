@@ -125,8 +125,8 @@ function Onboarding() {
           <p className="text-xs text-muted-foreground">Deslize ou toque no coração nos que você curtiu.</p>
         </div>
         <div className="text-right text-sm">
-          <div className={count >= 10 ? "text-2xl font-black text-success" : "text-2xl font-black text-primary"}>{count}</div>
-          <div className="text-xs text-muted-foreground">/ 10</div>
+          <div className={count >= 3 ? "text-2xl font-black text-success" : "text-2xl font-black text-primary"}>{count}</div>
+          <div className="text-xs text-muted-foreground">/ 3</div>
         </div>
       </div>
 
