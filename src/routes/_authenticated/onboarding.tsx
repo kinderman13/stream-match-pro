@@ -103,6 +103,7 @@ function Onboarding() {
       if (action === "dislike") {
         await rate({ data: { tmdbId: current.id, mediaType: current.media_type, rating: 2, source: "onboarding", title: current.title, posterPath: current.poster_path } });
       }
+      setCount((c) => c + 1);
     } catch (e) { console.error(e); }
     setTimeout(() => { setIdx((i) => i + 1); setExiting(null); setBusy(false); }, 250);
   }
@@ -148,8 +149,8 @@ function Onboarding() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Curta o que você gostaria de ver</h1>
-          <p className="text-xs text-muted-foreground">Você gostou de <span className="font-bold text-foreground">{count}</span> {count === 1 ? "conteúdo" : "conteúdos"}.</p>
-          <p className="mt-1 text-[11px] text-muted-foreground/80">Quanto mais conteúdos você curtir, mais precisas serão as recomendações.</p>
+          <p className="text-xs text-muted-foreground">Selecionados nesta sessão: <span className="font-bold text-foreground">{count}</span></p>
+          <p className="mt-1 text-[11px] text-muted-foreground/80">Faça pelo menos 3 interações para gerar recomendações desta sessão.</p>
         </div>
         <div className="text-right text-sm">
           <div className={count >= 3 ? "text-2xl font-black text-success" : "text-2xl font-black text-primary"}>{count}</div>
