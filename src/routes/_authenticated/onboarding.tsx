@@ -205,10 +205,10 @@ function Onboarding() {
 
       <div className="mt-4 flex items-center justify-between">
         <div className="text-xs text-muted-foreground">
-          {count < 10 ? `Faltam ${10 - count} para continuar` : "Pronto para avançar!"}
+          {count < 3 ? `Faltam ${3 - count} para continuar` : "Pronto para avançar!"}
         </div>
         <button
-          disabled={count < 10}
+          disabled={count < 3}
           onClick={finish}
           className="rounded-md bg-primary px-5 py-2 text-sm font-bold text-primary-foreground disabled:opacity-40"
         >
