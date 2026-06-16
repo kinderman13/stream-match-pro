@@ -206,7 +206,7 @@ function Onboarding() {
           <ThumbsDown className="h-6 w-6" />
         </button>
         <button
-          onClick={() => { if (!current || busy) return; setRatingValue(7); setRatingOpen(true); }}
+          onClick={() => openRating("watched")}
           disabled={!current || busy}
           aria-label="Já assisti"
           title="Já assisti"
