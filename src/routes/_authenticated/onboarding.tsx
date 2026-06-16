@@ -131,8 +131,9 @@ function Onboarding() {
     <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-xl flex-col px-4 py-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Os mais assistidos</h1>
-          <p className="text-xs text-muted-foreground">Deslize ou toque no coração nos que você curtiu.</p>
+          <h1 className="text-2xl font-bold">Curta o que você gostaria de ver</h1>
+          <p className="text-xs text-muted-foreground">Você gostou de <span className="font-bold text-foreground">{count}</span> {count === 1 ? "conteúdo" : "conteúdos"}.</p>
+          <p className="mt-1 text-[11px] text-muted-foreground/80">Quanto mais conteúdos você curtir, mais precisas serão as recomendações.</p>
         </div>
         <div className="text-right text-sm">
           <div className={count >= 3 ? "text-2xl font-black text-success" : "text-2xl font-black text-primary"}>{count}</div>
