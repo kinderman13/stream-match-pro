@@ -224,7 +224,7 @@ function Onboarding() {
           <HelpCircle className="h-6 w-6" />
         </button>
         <button
-          onClick={handleLike}
+          onClick={() => openRating("like")}
           disabled={!current || busy}
           aria-label="Gostei"
           title="Gostei"
