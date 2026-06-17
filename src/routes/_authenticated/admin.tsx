@@ -44,8 +44,13 @@ function AdminPage() {
   const updateSettingFn = useServerFn(adminUpdateSetting);
   const blockFn = useServerFn(adminBlockUser);
   const deleteFn = useServerFn(adminDeleteUser);
+  const reportsFn = useServerFn(adminListReports);
+  const resolveReportFn = useServerFn(adminResolveReport);
+  const alertsFn = useServerFn(adminListAlerts);
+  const resolveAlertFn = useServerFn(adminResolveAlert);
+  const runChecksFn = useServerFn(adminRunAlertChecks);
   const qc = useQueryClient();
-  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "logs" | "settings";
+  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "moderation" | "alerts" | "logs" | "settings";
   const [tab, setTab] = useState<Tab>("overview");
 
   const dashQ = useQuery({ queryKey: ["admin-dash"], queryFn: () => dashFn() });
@@ -53,6 +58,8 @@ function AdminPage() {
   const retentionQ = useQuery({ queryKey: ["admin-retention"], queryFn: () => retentionFn(), enabled: tab === "retention" });
   const logsQ = useQuery({ queryKey: ["admin-logs"], queryFn: () => logsFn({ data: {} }), enabled: tab === "logs" });
   const settingsQ = useQuery({ queryKey: ["admin-settings"], queryFn: () => settingsFn(), enabled: tab === "settings" });
+  const reportsQ = useQuery({ queryKey: ["admin-reports"], queryFn: () => reportsFn({ data: {} }), enabled: tab === "moderation" });
+  const alertsQ = useQuery({ queryKey: ["admin-alerts"], queryFn: () => alertsFn({ data: {} }), enabled: tab === "alerts" });
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "overview", label: "Visão Geral" },
@@ -61,6 +68,8 @@ function AdminPage() {
     { id: "platforms", label: "Plataformas" },
     { id: "recs", label: "Recomendações" },
     { id: "retention", label: "Retenção" },
+    { id: "moderation", label: "Moderação" },
+    { id: "alerts", label: "Alertas" },
     { id: "logs", label: "Logs" },
     { id: "settings", label: "Configurações" },
   ];
