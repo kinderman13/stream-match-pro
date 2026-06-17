@@ -1,7 +1,8 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { User, List, History, SlidersHorizontal, Settings, LogOut } from "lucide-react";
+import { User, List, History, SlidersHorizontal, Settings, LogOut, Mail } from "lucide-react";
+import { useSupport } from "@/components/SupportPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { getMyRoles } from "@/lib/admin.functions";
@@ -19,6 +20,7 @@ import {
 export function Header() {
   const { user } = useAuth();
   const router = useRouter();
+  const support = useSupport();
   const fetchMyRoles = useServerFn(getMyRoles);
   const fetchProfile = useServerFn(getProfile);
   const rolesQ = useQuery({
@@ -88,6 +90,9 @@ export function Header() {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/settings"><Settings className="mr-2 h-4 w-4" />Configurações</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); support.open(); }}>
+                  <Mail className="mr-2 h-4 w-4" />Fale Conosco
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
