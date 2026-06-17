@@ -113,6 +113,8 @@ function AdminPage() {
           <Users usersQ={usersQ} grantFn={grantFn} revokeFn={revokeFn} blockFn={blockFn} deleteFn={deleteFn} qc={qc} />
         )}
         {tab === "retention" && <Retention q={retentionQ} />}
+        {tab === "moderation" && <Moderation q={reportsQ} resolve={resolveReportFn} qc={qc} />}
+        {tab === "alerts" && <Alerts q={alertsQ} resolve={resolveAlertFn} runChecks={runChecksFn} qc={qc} />}
         {tab === "logs" && <Logs q={logsQ} />}
         {tab === "settings" && <Settings q={settingsQ} update={updateSettingFn} qc={qc} />}
       </div>
