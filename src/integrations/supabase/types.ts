@@ -248,6 +248,86 @@ export type Database = {
         }
         Relationships: []
       }
+      support_messages: {
+        Row: {
+          attachment_url: string | null
+          body: string
+          created_at: string
+          id: string
+          sender_id: string
+          sender_role: string
+          ticket_id: string
+        }
+        Insert: {
+          attachment_url?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          sender_id: string
+          sender_role: string
+          ticket_id: string
+        }
+        Update: {
+          attachment_url?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          sender_id?: string
+          sender_role?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          admin_unread_count: number
+          attachment_url: string | null
+          category: Database["public"]["Enums"]["support_category"]
+          created_at: string
+          id: string
+          last_message_at: string
+          status: Database["public"]["Enums"]["support_status"]
+          subject: string
+          updated_at: string
+          user_id: string
+          user_unread_count: number
+        }
+        Insert: {
+          admin_unread_count?: number
+          attachment_url?: string | null
+          category: Database["public"]["Enums"]["support_category"]
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          status?: Database["public"]["Enums"]["support_status"]
+          subject: string
+          updated_at?: string
+          user_id: string
+          user_unread_count?: number
+        }
+        Update: {
+          admin_unread_count?: number
+          attachment_url?: string | null
+          category?: Database["public"]["Enums"]["support_category"]
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          status?: Database["public"]["Enums"]["support_status"]
+          subject?: string
+          updated_at?: string
+          user_id?: string
+          user_unread_count?: number
+        }
+        Relationships: []
+      }
       system_logs: {
         Row: {
           category: string
@@ -372,6 +452,13 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      support_category:
+        | "bug"
+        | "feature"
+        | "question"
+        | "content_report"
+        | "contact"
+      support_status: "open" | "in_review" | "answered" | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -500,6 +587,14 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      support_category: [
+        "bug",
+        "feature",
+        "question",
+        "content_report",
+        "contact",
+      ],
+      support_status: ["open", "in_review", "answered", "closed"],
     },
   },
 } as const
