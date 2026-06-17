@@ -12,6 +12,8 @@ import {
   getMyRoles, adminListUsers, adminGrantRole, adminRevokeRole, adminGetDashboard,
   adminGetRetention, adminListLogs, adminGetSettings, adminUpdateSetting,
   adminBlockUser, adminDeleteUser,
+  adminListReports, adminResolveReport,
+  adminListAlerts, adminResolveAlert, adminRunAlertChecks,
 } from "@/lib/admin.functions";
 
 
