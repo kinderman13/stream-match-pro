@@ -678,3 +678,173 @@ function Settings({ q, update, qc }: any) {
   );
 }
 
+
+function Moderation({ q, resolve, qc }: any) {
+  const [filter, setFilter] = useState<"pending" | "resolved" | "dismissed" | "all">("pending");
+  const resolveM = useMutation({
+    mutationFn: (v: { id: string; status: "resolved" | "dismissed"; notes?: string }) => resolve({ data: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-reports"] }),
+  });
+  if (q.isLoading) return <div className="text-muted-foreground">Carregando…</div>;
+  if (q.error) return <div className="text-destructive">Erro: {(q.error as Error).message}</div>;
+  const rows = (q.data ?? []).filter((r: any) => filter === "all" ? true : r.status === filter);
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted-foreground">Filtro:</span>
+        {(["pending", "resolved", "dismissed", "all"] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => setFilter(s)}
+            className={`rounded-md px-3 py-1 text-xs ${filter === s ? "bg-primary text-primary-foreground" : "bg-secondary"}`}
+          >
+            {s === "pending" ? "Pendentes" : s === "resolved" ? "Resolvidas" : s === "dismissed" ? "Descartadas" : "Todas"}
+          </button>
+        ))}
+        <span className="ml-auto text-xs text-muted-foreground">{rows.length} registro(s)</span>
+      </div>
+      <div className="overflow-x-auto rounded-lg border border-border/60">
+        <table className="w-full text-sm">
+          <thead className="bg-secondary/40 text-left">
+            <tr>
+              <th className="px-3 py-2">Data</th>
+              <th className="px-3 py-2">Denunciante</th>
+              <th className="px-3 py-2">Alvo</th>
+              <th className="px-3 py-2">Motivo</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r: any) => (
+              <tr key={r.id} className="border-t border-border/40 align-top">
+                <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{new Date(r.created_at).toLocaleString("pt-BR")}</td>
+                <td className="px-3 py-2 text-xs">{r.reporter_name}</td>
+                <td className="px-3 py-2 text-xs">
+                  <div className="font-semibold">{r.target_label || r.target_id}</div>
+                  <div className="text-[10px] text-muted-foreground">{r.target_type} · {r.target_id}</div>
+                </td>
+                <td className="px-3 py-2">
+                  <div className="text-sm">{r.reason}</div>
+                  {r.details && <div className="mt-1 text-[11px] text-muted-foreground line-clamp-3">{r.details}</div>}
+                </td>
+                <td className="px-3 py-2">
+                  <span className={`rounded px-2 py-0.5 text-xs ${
+                    r.status === "pending" ? "bg-amber-500/15 text-amber-400"
+                    : r.status === "resolved" ? "bg-emerald-500/15 text-emerald-400"
+                    : "bg-muted text-muted-foreground"
+                  }`}>{r.status}</span>
+                  {r.moderator_notes && <div className="mt-1 text-[10px] text-muted-foreground line-clamp-2">{r.moderator_notes}</div>}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  {r.status === "pending" && (
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={async () => {
+                          const notes = prompt("Notas (opcional):") ?? undefined;
+                          try { await resolveM.mutateAsync({ id: r.id, status: "resolved", notes }); }
+                          catch (err: any) { alert(err.message); }
+                        }}
+                        className="rounded-md bg-emerald-500/20 px-3 py-1 text-xs text-emerald-400 hover:bg-emerald-500/30"
+                      >Resolver</button>
+                      <button
+                        onClick={async () => {
+                          try { await resolveM.mutateAsync({ id: r.id, status: "dismissed" }); }
+                          catch (err: any) { alert(err.message); }
+                        }}
+                        className="rounded-md bg-secondary px-3 py-1 text-xs"
+                      >Descartar</button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Nenhuma denúncia neste filtro.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Alerts({ q, resolve, runChecks, qc }: any) {
+  const resolveM = useMutation({
+    mutationFn: (v: { id: string }) => resolve({ data: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-alerts"] }),
+  });
+  const runM = useMutation({
+    mutationFn: () => runChecks(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-alerts"] }),
+  });
+  if (q.isLoading) return <div className="text-muted-foreground">Carregando…</div>;
+  if (q.error) return <div className="text-destructive">Erro: {(q.error as Error).message}</div>;
+  const rows = q.data ?? [];
+  const openCount = rows.filter((r: any) => r.status === "open").length;
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-sm">
+          <span className="font-semibold">{openCount}</span> alerta(s) aberto(s) de {rows.length}
+        </div>
+        <button
+          onClick={() => runM.mutate()}
+          disabled={runM.isPending}
+          className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60"
+        >
+          {runM.isPending ? "Verificando…" : "Verificar agora"}
+        </button>
+      </div>
+      <div className="space-y-2">
+        {rows.map((a: any) => (
+          <div
+            key={a.id}
+            className={`rounded-lg border p-4 ${
+              a.severity === "critical" ? "border-rose-500/40 bg-rose-500/5"
+              : a.severity === "warning" ? "border-amber-500/40 bg-amber-500/5"
+              : "border-border/60 bg-card/40"
+            } ${a.status === "resolved" ? "opacity-60" : ""}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className={`rounded px-2 py-0.5 text-[10px] uppercase ${
+                    a.severity === "critical" ? "bg-rose-500/20 text-rose-300"
+                    : a.severity === "warning" ? "bg-amber-500/20 text-amber-300"
+                    : "bg-primary/20 text-primary"
+                  }`}>{a.severity}</span>
+                  <span className="text-xs text-muted-foreground">{a.type}</span>
+                  <span className="text-xs text-muted-foreground">· {new Date(a.created_at).toLocaleString("pt-BR")}</span>
+                </div>
+                <h4 className="mt-1 font-semibold">{a.title}</h4>
+                {a.message && <p className="mt-1 text-sm text-muted-foreground">{a.message}</p>}
+                {a.metadata && Object.keys(a.metadata).length > 0 && (
+                  <pre className="mt-2 overflow-x-auto rounded bg-background/60 p-2 text-[10px] text-muted-foreground">
+{JSON.stringify(a.metadata, null, 2)}
+                  </pre>
+                )}
+              </div>
+              {a.status === "open" ? (
+                <button
+                  onClick={async () => {
+                    try { await resolveM.mutateAsync({ id: a.id }); }
+                    catch (err: any) { alert(err.message); }
+                  }}
+                  className="shrink-0 rounded-md bg-emerald-500/20 px-3 py-1 text-xs text-emerald-400 hover:bg-emerald-500/30"
+                >Marcar como resolvido</button>
+              ) : (
+                <span className="shrink-0 rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-400">resolvido</span>
+              )}
+            </div>
+          </div>
+        ))}
+        {rows.length === 0 && (
+          <div className="rounded-lg border border-border/60 bg-card/40 p-8 text-center text-muted-foreground">
+            Nenhum alerta. Clique em "Verificar agora" para rodar as heurísticas.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
