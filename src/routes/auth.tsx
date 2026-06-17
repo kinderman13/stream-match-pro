@@ -50,7 +50,7 @@ function AuthPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true); setErr(null);
+    setBusy(true); setErr(null); setInfo(null);
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
@@ -58,11 +58,18 @@ function AuthPage() {
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
+        await routeAfterAuth();
+      } else if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+        if (error) throw error;
+        setInfo("Se este email existir, enviamos um link de recuperação. Verifique sua caixa de entrada.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        await routeAfterAuth();
       }
-      await routeAfterAuth();
     } catch (e: any) {
       setErr(e.message || "Erro ao autenticar");
     } finally {
