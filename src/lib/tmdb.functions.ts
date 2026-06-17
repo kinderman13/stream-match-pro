@@ -5,6 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const MediaTypeSchema = z.enum(["movie", "tv"]);
 
 export const tmdbSearch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: { query: string; page?: number }) =>
     z.object({ query: z.string().min(1).max(100), page: z.number().int().min(1).max(50).optional() }).parse(d),
   )
