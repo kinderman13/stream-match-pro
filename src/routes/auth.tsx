@@ -1,9 +1,5 @@
 import { createFileRoute, useRouter, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -22,19 +18,7 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [guestOpen, setGuestOpen] = useState(false);
 
-  async function enterAsGuest() {
-    setBusy(true); setErr(null);
-    try {
-      const { error } = await supabase.auth.signInAnonymously();
-      if (error) throw error;
-      await routeAfterAuth();
-    } catch (e: any) {
-      setErr(e.message || "Erro ao entrar como visitante");
-      setBusy(false);
-    }
-  }
 
   async function routeAfterAuth() {
     router.navigate({ to: "/providers" });
