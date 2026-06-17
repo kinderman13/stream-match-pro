@@ -500,3 +500,223 @@ export const adminDeleteUser = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+
+// ---------------- Fase 5: moderação (denúncias) ----------------
+
+export const createReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    target_type: "movie" | "tv" | "user" | "review";
+    target_id: string;
+    target_label?: string;
+    reason: string;
+    details?: string;
+  }) =>
+    z.object({
+      target_type: z.enum(["movie", "tv", "user", "review"]),
+      target_id: z.string().min(1).max(128),
+      target_label: z.string().max(200).optional(),
+      reason: z.string().min(2).max(120),
+      details: z.string().max(1000).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("content_reports").insert({
+      reporter_id: context.userId,
+      target_type: data.target_type,
+      target_id: data.target_id,
+      target_label: data.target_label ?? null,
+      reason: data.reason,
+      details: data.details ?? null,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminListReports = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { status?: "pending" | "resolved" | "dismissed" | "all" }) =>
+    z.object({ status: z.enum(["pending", "resolved", "dismissed", "all"]).optional() }).parse(d ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let q = supabaseAdmin
+      .from("content_reports")
+      .select("id, reporter_id, target_type, target_id, target_label, reason, details, status, resolved_by, resolved_at, moderator_notes, created_at")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (data.status && data.status !== "all") q = q.eq("status", data.status);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    // Enrich with reporter display name
+    const reporterIds = Array.from(new Set((rows ?? []).map((r) => r.reporter_id)));
+    const namesMap = new Map<string, string>();
+    if (reporterIds.length > 0) {
+      const { data: profs } = await supabaseAdmin
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", reporterIds);
+      for (const p of profs ?? []) namesMap.set(p.id, p.display_name ?? "—");
+    }
+    return (rows ?? []).map((r) => ({ ...r, reporter_name: namesMap.get(r.reporter_id) ?? "—" }));
+  });
+
+export const adminResolveReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; status: "resolved" | "dismissed"; notes?: string }) =>
+    z.object({
+      id: z.string().uuid(),
+      status: z.enum(["resolved", "dismissed"]),
+      notes: z.string().max(1000).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("content_reports")
+      .update({
+        status: data.status,
+        resolved_by: context.userId,
+        resolved_at: new Date().toISOString(),
+        moderator_notes: data.notes ?? null,
+      })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------------- Fase 5: alertas do sistema ----------------
+
+export const adminListAlerts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { status?: "open" | "resolved" | "all" }) =>
+    z.object({ status: z.enum(["open", "resolved", "all"]).optional() }).parse(d ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let q = supabaseAdmin
+      .from("admin_alerts")
+      .select("id, type, severity, title, message, metadata, status, resolved_by, resolved_at, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (data.status && data.status !== "all") q = q.eq("status", data.status);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+export const adminResolveAlert = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("admin_alerts")
+      .update({ status: "resolved", resolved_by: context.userId, resolved_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/**
+ * Roda heurísticas e abre alertas quando algo sai do esperado.
+ * Idempotente: cada tipo só tem 1 alerta "open" por vez (unique index).
+ */
+export const adminRunAlertChecks = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const now = Date.now();
+    const dayAgo = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+    const twoDaysAgo = new Date(now - 48 * 60 * 60 * 1000).toISOString();
+    const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const hourAgo = new Date(now - 60 * 60 * 1000).toISOString();
+
+    type AlertDraft = {
+      type: string;
+      severity: "info" | "warning" | "critical";
+      title: string;
+      message: string;
+      metadata: Record<string, unknown>;
+    };
+    const drafts: AlertDraft[] = [];
+
+    // 1) Queda de engajamento: interactions 24h vs média 7d/7
+    const [last24, last7d] = await Promise.all([
+      supabaseAdmin.from("interactions").select("id", { count: "exact", head: true }).gte("created_at", dayAgo),
+      supabaseAdmin.from("interactions").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgo),
+    ]);
+    const c24 = last24.count ?? 0;
+    const avg7 = Math.round(((last7d.count ?? 0) / 7));
+    if (avg7 >= 10 && c24 < avg7 * 0.5) {
+      drafts.push({
+        type: "engagement_drop",
+        severity: "warning",
+        title: "Queda de engajamento nas últimas 24h",
+        message: `Interações nas últimas 24h (${c24}) caíram mais de 50% abaixo da média semanal (${avg7}/dia).`,
+        metadata: { last_24h: c24, avg_7d_per_day: avg7 },
+      });
+    }
+
+    // 2) Sem novos cadastros em 48h
+    const { count: signups48 } = await supabaseAdmin
+      .from("profiles").select("id", { count: "exact", head: true }).gte("created_at", twoDaysAgo);
+    if ((signups48 ?? 0) === 0) {
+      drafts.push({
+        type: "no_signups_48h",
+        severity: "info",
+        title: "Nenhum novo cadastro em 48h",
+        message: "Não houve novos cadastros nas últimas 48 horas.",
+        metadata: { window_hours: 48 },
+      });
+    }
+
+    // 3) Pico de erros nos logs (última hora >= 20 OU >= 3x média horária 24h)
+    const [errLastHour, errLast24h] = await Promise.all([
+      supabaseAdmin.from("system_logs").select("id", { count: "exact", head: true })
+        .eq("level", "error").gte("created_at", hourAgo),
+      supabaseAdmin.from("system_logs").select("id", { count: "exact", head: true })
+        .eq("level", "error").gte("created_at", dayAgo),
+    ]);
+    const eHour = errLastHour.count ?? 0;
+    const eAvgHour = Math.round(((errLast24h.count ?? 0) / 24));
+    if (eHour >= 20 || (eAvgHour >= 2 && eHour >= eAvgHour * 3)) {
+      drafts.push({
+        type: "error_spike",
+        severity: eHour >= 50 ? "critical" : "warning",
+        title: "Pico de erros nos logs",
+        message: `${eHour} erros na última hora (média 24h: ${eAvgHour}/h).`,
+        metadata: { errors_last_hour: eHour, avg_per_hour_24h: eAvgHour },
+      });
+    }
+
+    // 4) Denúncias pendentes acumuladas
+    const { count: pendingReports } = await supabaseAdmin
+      .from("content_reports").select("id", { count: "exact", head: true }).eq("status", "pending");
+    if ((pendingReports ?? 0) >= 10) {
+      drafts.push({
+        type: "reports_backlog",
+        severity: (pendingReports ?? 0) >= 50 ? "critical" : "warning",
+        title: "Denúncias pendentes acumuladas",
+        message: `${pendingReports} denúncias aguardam moderação.`,
+        metadata: { pending: pendingReports },
+      });
+    }
+
+    // Insere apenas as que não têm "open" do mesmo tipo (unique index garante)
+    const created: string[] = [];
+    for (const d of drafts) {
+      const { error } = await supabaseAdmin.from("admin_alerts").insert({
+        type: d.type, severity: d.severity, title: d.title, message: d.message, metadata: d.metadata as never,
+      });
+      if (!error) created.push(d.type);
+    }
+    return { checked: drafts.length, created };
+  });
