@@ -15,6 +15,7 @@ import {
   adminListReports, adminResolveReport,
   adminListAlerts, adminResolveAlert, adminRunAlertChecks,
 } from "@/lib/admin.functions";
+import { adminListTickets, adminUpdateTicketStatus, getTicket, replyTicket } from "@/lib/support.functions";
 
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -50,8 +51,13 @@ function AdminPage() {
   const resolveAlertFn = useServerFn(adminResolveAlert);
   const runChecksFn = useServerFn(adminRunAlertChecks);
   const qc = useQueryClient();
-  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "moderation" | "alerts" | "logs" | "settings";
+  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "support" | "moderation" | "alerts" | "logs" | "settings";
   const [tab, setTab] = useState<Tab>("overview");
+
+  const ticketsListFn = useServerFn(adminListTickets);
+  const ticketGetFn = useServerFn(getTicket);
+  const ticketReplyFn = useServerFn(replyTicket);
+  const ticketStatusFn = useServerFn(adminUpdateTicketStatus);
 
   const dashQ = useQuery({ queryKey: ["admin-dash"], queryFn: () => dashFn() });
   const usersQ = useQuery({ queryKey: ["admin-users"], queryFn: () => usersFn() });
@@ -60,6 +66,7 @@ function AdminPage() {
   const settingsQ = useQuery({ queryKey: ["admin-settings"], queryFn: () => settingsFn(), enabled: tab === "settings" });
   const reportsQ = useQuery({ queryKey: ["admin-reports"], queryFn: () => reportsFn({ data: {} }), enabled: tab === "moderation" });
   const alertsQ = useQuery({ queryKey: ["admin-alerts"], queryFn: () => alertsFn({ data: {} }), enabled: tab === "alerts" });
+  const ticketsQ = useQuery({ queryKey: ["admin-tickets"], queryFn: () => ticketsListFn({ data: {} }), enabled: tab === "support" });
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "overview", label: "Visão Geral" },
@@ -68,6 +75,7 @@ function AdminPage() {
     { id: "platforms", label: "Plataformas" },
     { id: "recs", label: "Recomendações" },
     { id: "retention", label: "Retenção" },
+    { id: "support", label: "Suporte" },
     { id: "moderation", label: "Moderação" },
     { id: "alerts", label: "Alertas" },
     { id: "logs", label: "Logs" },
@@ -113,6 +121,7 @@ function AdminPage() {
           <Users usersQ={usersQ} grantFn={grantFn} revokeFn={revokeFn} blockFn={blockFn} deleteFn={deleteFn} qc={qc} />
         )}
         {tab === "retention" && <Retention q={retentionQ} />}
+        {tab === "support" && <Support q={ticketsQ} getFn={ticketGetFn} replyFn={ticketReplyFn} statusFn={ticketStatusFn} qc={qc} />}
         {tab === "moderation" && <Moderation q={reportsQ} resolve={resolveReportFn} qc={qc} />}
         {tab === "alerts" && <Alerts q={alertsQ} resolve={resolveAlertFn} runChecks={runChecksFn} qc={qc} />}
         {tab === "logs" && <Logs q={logsQ} />}
