@@ -77,7 +77,8 @@ export const getTicket = createServerFn({ method: "GET" })
     // Clear unread for the side that opened it
     const admin = await isAdmin(context);
     const field = admin ? "admin_unread_count" : "user_unread_count";
-    await context.supabase.from("support_tickets").update({ [field]: 0 }).eq("id", data.id);
+    const patch: Record<string, number> = { [field]: 0 };
+    await (context.supabase.from("support_tickets") as any).update(patch).eq("id", data.id);
     return { ticket: t, messages: msgs ?? [] };
   });
 
