@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { useActivityPing } from "../hooks/use-activity-ping";
+import { BackButton } from "../components/BackButton";
 
 
 function NotFoundComponent() {
