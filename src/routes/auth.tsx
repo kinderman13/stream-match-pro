@@ -16,11 +16,12 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const router = useRouter();
   
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [guestOpen, setGuestOpen] = useState(false);
 
   async function enterAsGuest() {
