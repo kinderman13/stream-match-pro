@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { getMyRoles } from "@/lib/admin.functions";
 import { getProfile } from "@/lib/profile.functions";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { InstallAppButton } from "@/components/InstallAppButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +63,7 @@ export function Header() {
             {rolesQ.data?.isAdmin && (
               <Link to="/admin" className="rounded px-3 py-1.5 text-primary hover:bg-secondary">Admin</Link>
             )}
+            <InstallAppButton className="ml-1 inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/60 px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-secondary" />
             <DropdownMenu>
               <DropdownMenuTrigger className="ml-2 outline-none ring-primary/40 focus-visible:ring-2 rounded-full">
                 <Avatar className="h-9 w-9 border border-border">
