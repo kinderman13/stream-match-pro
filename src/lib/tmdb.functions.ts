@@ -94,6 +94,7 @@ export const tmdbOnboardingFeed = createServerFn({ method: "POST" })
 
 
 export const tmdbDetails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: { mediaType: "movie" | "tv"; id: number }) =>
     z.object({ mediaType: MediaTypeSchema, id: z.number().int() }).parse(d),
   )
