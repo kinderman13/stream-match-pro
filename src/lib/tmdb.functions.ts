@@ -15,6 +15,7 @@ export const tmdbSearch = createServerFn({ method: "POST" })
   });
 
 export const tmdbDiscover = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: {
     mediaType: "movie" | "tv";
     page?: number;
