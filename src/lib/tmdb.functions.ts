@@ -5,6 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const MediaTypeSchema = z.enum(["movie", "tv"]);
 
 export const tmdbSearch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: { query: string; page?: number }) =>
     z.object({ query: z.string().min(1).max(100), page: z.number().int().min(1).max(50).optional() }).parse(d),
   )
@@ -14,6 +15,7 @@ export const tmdbSearch = createServerFn({ method: "POST" })
   });
 
 export const tmdbDiscover = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: {
     mediaType: "movie" | "tv";
     page?: number;
@@ -92,6 +94,7 @@ export const tmdbOnboardingFeed = createServerFn({ method: "POST" })
 
 
 export const tmdbDetails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: { mediaType: "movie" | "tv"; id: number }) =>
     z.object({ mediaType: MediaTypeSchema, id: z.number().int() }).parse(d),
   )
