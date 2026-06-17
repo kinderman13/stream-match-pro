@@ -15,6 +15,7 @@ import {
   adminListReports, adminResolveReport,
   adminListAlerts, adminResolveAlert, adminRunAlertChecks,
 } from "@/lib/admin.functions";
+import { adminListTickets, adminUpdateTicketStatus, getTicket, replyTicket } from "@/lib/support.functions";
 
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -50,8 +51,13 @@ function AdminPage() {
   const resolveAlertFn = useServerFn(adminResolveAlert);
   const runChecksFn = useServerFn(adminRunAlertChecks);
   const qc = useQueryClient();
-  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "moderation" | "alerts" | "logs" | "settings";
+  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "support" | "moderation" | "alerts" | "logs" | "settings";
   const [tab, setTab] = useState<Tab>("overview");
+
+  const ticketsListFn = useServerFn(adminListTickets);
+  const ticketGetFn = useServerFn(getTicket);
+  const ticketReplyFn = useServerFn(replyTicket);
+  const ticketStatusFn = useServerFn(adminUpdateTicketStatus);
 
   const dashQ = useQuery({ queryKey: ["admin-dash"], queryFn: () => dashFn() });
   const usersQ = useQuery({ queryKey: ["admin-users"], queryFn: () => usersFn() });
@@ -60,6 +66,7 @@ function AdminPage() {
   const settingsQ = useQuery({ queryKey: ["admin-settings"], queryFn: () => settingsFn(), enabled: tab === "settings" });
   const reportsQ = useQuery({ queryKey: ["admin-reports"], queryFn: () => reportsFn({ data: {} }), enabled: tab === "moderation" });
   const alertsQ = useQuery({ queryKey: ["admin-alerts"], queryFn: () => alertsFn({ data: {} }), enabled: tab === "alerts" });
+  const ticketsQ = useQuery({ queryKey: ["admin-tickets"], queryFn: () => ticketsListFn({ data: {} }), enabled: tab === "support" });
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "overview", label: "Visão Geral" },
@@ -68,6 +75,7 @@ function AdminPage() {
     { id: "platforms", label: "Plataformas" },
     { id: "recs", label: "Recomendações" },
     { id: "retention", label: "Retenção" },
+    { id: "support", label: "Suporte" },
     { id: "moderation", label: "Moderação" },
     { id: "alerts", label: "Alertas" },
     { id: "logs", label: "Logs" },
@@ -113,6 +121,7 @@ function AdminPage() {
           <Users usersQ={usersQ} grantFn={grantFn} revokeFn={revokeFn} blockFn={blockFn} deleteFn={deleteFn} qc={qc} />
         )}
         {tab === "retention" && <Retention q={retentionQ} />}
+        {tab === "support" && <Support q={ticketsQ} getFn={ticketGetFn} replyFn={ticketReplyFn} statusFn={ticketStatusFn} qc={qc} />}
         {tab === "moderation" && <Moderation q={reportsQ} resolve={resolveReportFn} qc={qc} />}
         {tab === "alerts" && <Alerts q={alertsQ} resolve={resolveAlertFn} runChecks={runChecksFn} qc={qc} />}
         {tab === "logs" && <Logs q={logsQ} />}
@@ -842,6 +851,145 @@ function Alerts({ q, resolve, runChecks, qc }: any) {
         {rows.length === 0 && (
           <div className="rounded-lg border border-border/60 bg-card/40 p-8 text-center text-muted-foreground">
             Nenhum alerta. Clique em "Verificar agora" para rodar as heurísticas.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const TICKET_STATUS_LABEL: Record<string, string> = {
+  open: "Aberto", in_review: "Em análise", answered: "Respondido", closed: "Fechado",
+};
+const TICKET_CATEGORY_LABEL: Record<string, string> = {
+  bug: "Problema", feature: "Sugestão", question: "Dúvida", content_report: "Denúncia", contact: "Contato",
+};
+
+function Support({
+  q, getFn, replyFn, statusFn, qc,
+}: { q: any; getFn: any; replyFn: any; statusFn: any; qc: any }) {
+  const [filter, setFilter] = useState<string>("all");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [reply, setReply] = useState("");
+  const threadQ = useQuery({
+    queryKey: ["admin-ticket", selectedId],
+    queryFn: () => getFn({ data: { id: selectedId! } }),
+    enabled: !!selectedId,
+  });
+  const replyMut = useMutation({
+    mutationFn: async () => replyFn({ data: { id: selectedId!, message: reply } }),
+    onSuccess: async () => {
+      setReply("");
+      await qc.invalidateQueries({ queryKey: ["admin-ticket", selectedId] });
+      await qc.invalidateQueries({ queryKey: ["admin-tickets"] });
+    },
+  });
+  const statusMut = useMutation({
+    mutationFn: async (status: string) => statusFn({ data: { id: selectedId!, status } }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["admin-ticket", selectedId] });
+      await qc.invalidateQueries({ queryKey: ["admin-tickets"] });
+    },
+  });
+
+  if (q.isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+  const tickets = (q.data ?? []).filter((t: any) => filter === "all" || t.status === filter);
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-1">
+          {["all", "open", "in_review", "answered", "closed"].map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded-full border px-3 py-1 text-xs ${filter === f ? "border-primary text-foreground" : "border-border text-muted-foreground hover:text-foreground"}`}
+            >
+              {f === "all" ? "Todos" : TICKET_STATUS_LABEL[f]}
+            </button>
+          ))}
+        </div>
+        <ul className="divide-y divide-border/60 rounded-md border border-border/60">
+          {tickets.length === 0 && (
+            <li className="px-4 py-6 text-center text-sm text-muted-foreground">Nenhuma solicitação.</li>
+          )}
+          {tickets.map((t: any) => (
+            <li key={t.id}>
+              <button
+                onClick={() => setSelectedId(t.id)}
+                className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-secondary/60 ${selectedId === t.id ? "bg-secondary/60" : ""}`}
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{t.subject}</div>
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    {t.user_name || t.user_email || t.user_id.slice(0, 8)} · {TICKET_CATEGORY_LABEL[t.category]} · {new Date(t.last_message_at).toLocaleString()}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {TICKET_STATUS_LABEL[t.status]}
+                  </span>
+                  {t.admin_unread_count > 0 && <span className="h-2 w-2 rounded-full bg-primary" />}
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="rounded-md border border-border/60 p-4">
+        {!selectedId && <p className="text-sm text-muted-foreground">Selecione uma solicitação para ver os detalhes.</p>}
+        {selectedId && threadQ.isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
+        {selectedId && threadQ.data && (
+          <div className="flex h-full flex-col gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
+              <div className="min-w-0">
+                <div className="text-base font-semibold">{threadQ.data.ticket.subject}</div>
+                <div className="text-xs text-muted-foreground">
+                  {TICKET_CATEGORY_LABEL[threadQ.data.ticket.category]} · {new Date(threadQ.data.ticket.created_at).toLocaleString()}
+                </div>
+              </div>
+              <select
+                value={threadQ.data.ticket.status}
+                onChange={(e) => statusMut.mutate(e.target.value)}
+                className="rounded border border-border bg-background px-2 py-1 text-xs"
+              >
+                {Object.entries(TICKET_STATUS_LABEL).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+            </div>
+            <ul className="flex-1 space-y-3 overflow-y-auto">
+              {threadQ.data.messages.map((m: any) => (
+                <li key={m.id} className={`flex ${m.sender_role === "admin" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${m.sender_role === "admin" ? "bg-primary/10" : "bg-secondary"}`}>
+                    <div className="whitespace-pre-wrap">{m.body}</div>
+                    <div className="mt-1 text-[10px] text-muted-foreground">
+                      {m.sender_role === "admin" ? "Admin" : "Usuário"} · {new Date(m.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <form
+              className="flex items-end gap-2 border-t border-border/60 pt-3"
+              onSubmit={(e) => { e.preventDefault(); if (reply.trim()) replyMut.mutate(); }}
+            >
+              <textarea
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                rows={2}
+                placeholder="Escreva uma resposta…"
+                className="flex-1 rounded border border-border bg-background px-3 py-2 text-sm"
+              />
+              <button
+                type="submit"
+                disabled={replyMut.isPending || !reply.trim()}
+                className="rounded bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              >
+                {replyMut.isPending ? "Enviando…" : "Enviar resposta"}
+              </button>
+            </form>
           </div>
         )}
       </div>
