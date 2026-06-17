@@ -11,13 +11,14 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const router = useRouter();
-  
+
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
 
 
   async function routeAfterAuth() {
@@ -26,11 +27,22 @@ function AuthPage() {
 
 
   useEffect(() => {
+    let active = true;
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) routeAfterAuth();
+      if (!active) return;
+      if (data.session) {
+        routeAfterAuth();
+      } else {
+        setCheckingSession(false);
+      }
     });
+    return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (checkingSession) {
+    return <SplashScreen />;
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
