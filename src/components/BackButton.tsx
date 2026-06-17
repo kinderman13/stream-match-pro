@@ -18,16 +18,18 @@ export function BackButton() {
   };
 
   return (
-    <div className="pointer-events-none fixed left-3 top-3 z-50 sm:left-4 sm:top-4">
-      <button
-        type="button"
-        onClick={handleClick}
-        aria-label="Voltar para página anterior"
-        className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/70 px-3 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur-md transition-all hover:border-border hover:bg-background/90 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 active:scale-[0.97] sm:text-sm"
-      >
-        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-        <span>Voltar</span>
-      </button>
+    <div className="w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
+      <div className="mx-auto flex w-full max-w-6xl px-4 py-3 sm:px-6">
+        <button
+          type="button"
+          onClick={handleClick}
+          aria-label="Voltar para página anterior"
+          className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 active:scale-[0.97] sm:text-sm"
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          <span>Voltar</span>
+        </button>
+      </div>
     </div>
   );
 }
