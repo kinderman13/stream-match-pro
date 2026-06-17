@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { getMyRoles } from "@/lib/admin.functions";
 import { getProfile } from "@/lib/profile.functions";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { InstallAppButton } from "@/components/InstallAppButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
