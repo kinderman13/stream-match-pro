@@ -60,8 +60,21 @@
 
 @layer base {
   * { border-color: var(--color-border); }
-  html, body { background-color: var(--color-background); color: var(--color-foreground); }
-  body { font-family: "Inter", system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+  html, body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body {
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100svh;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  img, video, canvas, svg { max-width: 100%; height: auto; }
 }
 
 @utility sm-scroll-x {
