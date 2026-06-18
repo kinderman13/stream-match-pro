@@ -88,6 +88,7 @@ export function Header() {
             <nav className="hidden items-center gap-1 text-sm lg:flex">
               <Link to="/providers" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Início</Link>
               <Link to="/recommendations" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Recomendações</Link>
+              <Link to="/dna" className="inline-flex items-center gap-1 rounded px-3 py-1.5 font-semibold text-primary hover:bg-secondary"><Dna className="h-4 w-4" />DNA</Link>
               <Link to="/list" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Minha Lista</Link>
               {rolesQ.data?.isAdmin && (
                 <Link to="/admin" className="rounded px-3 py-1.5 text-primary hover:bg-secondary">Admin</Link>
