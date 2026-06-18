@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Smartphone, Apple, Monitor, Download, Share, Plus, Check } from "lucide-react";
+import { Download, Share, Plus, Check, MoreVertical, MonitorDown, Smartphone, Apple, Monitor } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,20 +13,28 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-type DeviceChoice = "android" | "ios" | "desktop" | null;
+type Device = "android" | "ios" | "desktop";
+
+function detectDevice(): Device {
+  if (typeof navigator === "undefined") return "desktop";
+  const ua = navigator.userAgent || "";
+  if (/iPhone|iPad|iPod/i.test(ua)) return "ios";
+  if (/Android/i.test(ua)) return "android";
+  return "desktop";
+}
 
 export function InstallAppButton({ className }: { className?: string }) {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [open, setOpen] = useState(false);
-  const [device, setDevice] = useState<DeviceChoice>(null);
+  const [device, setDevice] = useState<Device>("desktop");
 
   useEffect(() => {
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
-      // iOS Safari
       (window.navigator as unknown as { standalone?: boolean }).standalone === true;
     setInstalled(isStandalone);
+    setDevice(detectDevice());
 
     const onPrompt = (e: Event) => {
       e.preventDefault();
@@ -47,66 +55,75 @@ export function InstallAppButton({ className }: { className?: string }) {
 
   if (installed) return null;
 
-  function reset() {
-    setOpen(false);
-    setTimeout(() => setDevice(null), 200);
+  async function handleClick() {
+    // If a native prompt is available (Android/Chromium desktop), use it directly.
+    if (deferred) {
+      try {
+        await deferred.prompt();
+        const { outcome } = await deferred.userChoice;
+        if (outcome === "accepted") {
+          setDeferred(null);
+          return;
+        }
+      } catch {
+        // fall through to instructions
+      }
+    }
+    setOpen(true);
   }
 
-  async function triggerNative() {
-    if (!deferred) return false;
-    await deferred.prompt();
-    const { outcome } = await deferred.userChoice;
-    if (outcome === "accepted") {
-      setDeferred(null);
-      reset();
-    }
-    return true;
-  }
-
-  async function pickDevice(d: Exclude<DeviceChoice, null>) {
-    setDevice(d);
-    if (d === "android" || d === "desktop") {
-      await triggerNative();
-    }
-  }
+  const DeviceIcon = device === "ios" ? Apple : device === "android" ? Smartphone : Monitor;
+  const title =
+    device === "ios"
+      ? "Instale o StreamMatch no seu iPhone"
+      : device === "android"
+        ? "Instale o StreamMatch no seu celular"
+        : "Instale o StreamMatch no seu computador";
+  const subtitle =
+    device === "desktop"
+      ? "Adicione o StreamMatch ao seu computador e utilize como um aplicativo nativo."
+      : "Adicione o StreamMatch à sua tela inicial e utilize como um aplicativo nativo.";
 
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={handleClick}
         className={
           className ??
           "inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/60 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-secondary"
         }
-        aria-label="Baixar aplicativo"
+        aria-label="Instalar aplicativo"
       >
         <Download className="h-3.5 w-3.5" />
-        Baixar App
+        Instalar App
       </button>
 
-      <Dialog open={open} onOpenChange={(v) => (v ? setOpen(true) : reset())}>
-        <DialogContent className="max-w-sm">
-          {!device && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Instalar StreamMatch</DialogTitle>
-                <DialogDescription>Qual dispositivo você está utilizando?</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-2">
-                <DeviceOption icon={<Smartphone className="h-5 w-5" />} label="Android" onClick={() => pickDevice("android")} />
-                <DeviceOption icon={<Apple className="h-5 w-5" />} label="iPhone / iPad" onClick={() => pickDevice("ios")} />
-                <DeviceOption icon={<Monitor className="h-5 w-5" />} label="Computador" onClick={() => pickDevice("desktop")} />
-              </div>
-            </>
-          )}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-sm border-border bg-card">
+          <DialogHeader>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <DeviceIcon className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-center">{title}</DialogTitle>
+            <DialogDescription className="text-center">{subtitle}</DialogDescription>
+          </DialogHeader>
 
-          {device === "ios" && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Instalar no iPhone / iPad</DialogTitle>
-                <DialogDescription>Use o Safari para adicionar à Tela de Início.</DialogDescription>
-              </DialogHeader>
-              <ol className="space-y-3 text-sm">
+          <ol className="space-y-2.5 text-sm">
+            {device === "android" && (
+              <>
+                <Step n={1} icon={<MoreVertical className="h-4 w-4" />}>
+                  Toque nos <strong>três pontos</strong> do navegador.
+                </Step>
+                <Step n={2} icon={<Plus className="h-4 w-4" />}>
+                  Selecione <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>.
+                </Step>
+                <Step n={3} icon={<Check className="h-4 w-4" />}>
+                  Confirme a instalação.
+                </Step>
+              </>
+            )}
+            {device === "ios" && (
+              <>
                 <Step n={1} icon={<Share className="h-4 w-4" />}>
                   Toque no botão <strong>Compartilhar</strong> do Safari.
                 </Step>
@@ -114,50 +131,35 @@ export function InstallAppButton({ className }: { className?: string }) {
                   Selecione <strong>Adicionar à Tela de Início</strong>.
                 </Step>
                 <Step n={3} icon={<Check className="h-4 w-4" />}>
-                  Toque em <strong>Adicionar</strong> para confirmar.
+                  Confirme a instalação.
                 </Step>
-              </ol>
-              <button
-                onClick={reset}
-                className="mt-2 w-full rounded-md bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-              >
-                Entendi
-              </button>
-            </>
-          )}
+              </>
+            )}
+            {device === "desktop" && (
+              <>
+                <Step n={1} icon={<MonitorDown className="h-4 w-4" />}>
+                  Clique no <strong>ícone de instalação</strong> na barra de endereço do navegador.
+                </Step>
+                <Step n={2} icon={<Check className="h-4 w-4" />}>
+                  Confirme a instalação.
+                </Step>
+              </>
+            )}
+          </ol>
 
-          {(device === "android" || device === "desktop") && !deferred && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Instalação não disponível agora</DialogTitle>
-                <DialogDescription>
-                  Seu navegador ainda não ofereceu o prompt de instalação. Abra o menu do navegador
-                  e procure por <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>.
-                </DialogDescription>
-              </DialogHeader>
-              <button
-                onClick={reset}
-                className="mt-2 w-full rounded-md bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-              >
-                Fechar
-              </button>
-            </>
-          )}
+          <p className="text-center text-xs text-muted-foreground">
+            O StreamMatch aparecerá como um aplicativo no seu dispositivo.
+          </p>
+
+          <button
+            onClick={() => setOpen(false)}
+            className="mt-1 w-full rounded-md bg-primary py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+          >
+            Entendi
+          </button>
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-function DeviceOption({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-left text-sm font-medium transition hover:border-primary hover:bg-secondary"
-    >
-      <span className="text-primary">{icon}</span>
-      <span>{label}</span>
-    </button>
   );
 }
 
