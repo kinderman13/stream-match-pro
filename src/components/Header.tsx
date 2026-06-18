@@ -13,6 +13,7 @@ import {
   Menu,
   Home,
   Clapperboard,
+  Dna,
 } from "lucide-react";
 import { useSupport } from "@/components/SupportPanel";
 import { supabase } from "@/integrations/supabase/client";
