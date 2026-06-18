@@ -1056,11 +1056,3 @@ function DnaStats({ q }: { q: any }) {
   );
 }
 
-function Kpi({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-2xl font-black">{value}</div>
-    </div>
-  );
-}
