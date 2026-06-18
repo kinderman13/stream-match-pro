@@ -1013,10 +1013,10 @@ function DnaStats({ q }: { q: any }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Total de DNAs gerados" value={d.totalDnas} />
-        <Kpi label="Compartilhamentos" value={d.totalShares} />
-        <Kpi label="Taxa de share" value={`${d.shareRate}%`} />
-        <Kpi label="Animal mais comum" value={ANIMAL_LABEL[d.mostCommonAnimal] ?? "—"} />
+        <Kpi icon="🧬" label="Total de DNAs gerados" value={d.totalDnas} />
+        <Kpi icon="📤" label="Compartilhamentos" value={d.totalShares} />
+        <Kpi icon="📊" label="Taxa de share" value={`${d.shareRate}%`} />
+        <Kpi icon="🦁" label="Animal mais comum" value={ANIMAL_LABEL[d.mostCommonAnimal] ?? "—"} />
       </div>
       <div className="grid gap-6 md:grid-cols-2">
         <div className="rounded-xl border border-border bg-card p-4">
@@ -1056,11 +1056,3 @@ function DnaStats({ q }: { q: any }) {
   );
 }
 
-function Kpi({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-2xl font-black">{value}</div>
-    </div>
-  );
-}
