@@ -41,10 +41,12 @@ export const tmdbDiscover = createServerFn({ method: "POST" })
 
 export const tmdbOnboardingFeed = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { page?: number; mediaType?: "movie" | "tv" }) =>
+  .inputValidator((d: { page?: number; mediaType?: "movie" | "tv"; excludeIds?: string[]; sortBy?: string }) =>
     z.object({
-      page: z.number().int().min(1).max(50).optional(),
+      page: z.number().int().min(1).max(500).optional(),
       mediaType: MediaTypeSchema.optional(),
+      excludeIds: z.array(z.string().max(20)).max(2000).optional(),
+      sortBy: z.string().max(40).optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -53,24 +55,33 @@ export const tmdbOnboardingFeed = createServerFn({ method: "POST" })
     const [{ data: prefs }, { data: ratingsData }, { data: interactionsData }] = await Promise.all([
       context.supabase.from("user_preferences").select("selected_providers").eq("user_id", context.userId).maybeSingle(),
       context.supabase.from("ratings").select("tmdb_id,media_type").eq("user_id", context.userId),
-      context.supabase.from("interactions").select("tmdb_id,media_type,action").eq("user_id", context.userId),
+      context.supabase.from("interactions").select("tmdb_id,media_type,action,created_at").eq("user_id", context.userId),
     ]);
     const providerIds = (prefs?.selected_providers as number[] | null) ?? [];
     const seen = new Set<string>();
     for (const r of (ratingsData ?? []) as { tmdb_id: number; media_type: string }[]) {
       seen.add(`${r.media_type}:${r.tmdb_id}`);
     }
-    for (const i of (interactionsData ?? []) as { tmdb_id: number; media_type: string; action: string }[]) {
-      // Only "skip" can resurface; everything else is permanently filtered out.
-      if (i.action !== "skip") seen.add(`${i.media_type}:${i.tmdb_id}`);
+    const SKIP_BLOCK_MS = 15 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    for (const i of (interactionsData ?? []) as { tmdb_id: number; media_type: string; action: string; created_at: string }[]) {
+      if (i.action === "skip") {
+        const t = new Date(i.created_at).getTime();
+        if (now - t < SKIP_BLOCK_MS) seen.add(`${i.media_type}:${i.tmdb_id}`);
+      } else {
+        seen.add(`${i.media_type}:${i.tmdb_id}`);
+      }
     }
+    for (const k of data.excludeIds ?? []) seen.add(k);
+
+    const sortBy = data.sortBy ?? "popularity.desc";
 
     async function fetchPage(p: number) {
       if (!providerIds.length) return trending(data.mediaType ?? "all", p);
-      if (data.mediaType) return discover({ mediaType: data.mediaType, page: p, providerIds, sortBy: "popularity.desc" });
+      if (data.mediaType) return discover({ mediaType: data.mediaType, page: p, providerIds, sortBy });
       const [movies, tv] = await Promise.all([
-        discover({ mediaType: "movie", page: p, providerIds, sortBy: "popularity.desc" }),
-        discover({ mediaType: "tv", page: p, providerIds, sortBy: "popularity.desc" }),
+        discover({ mediaType: "movie", page: p, providerIds, sortBy }),
+        discover({ mediaType: "tv", page: p, providerIds, sortBy }),
       ]);
       const merged: typeof movies = [];
       const max = Math.max(movies.length, tv.length);
@@ -82,10 +93,15 @@ export const tmdbOnboardingFeed = createServerFn({ method: "POST" })
     }
 
     const out: Awaited<ReturnType<typeof fetchPage>> = [];
-    for (let p = startPage; p < startPage + 5 && out.length < 10; p++) {
+    // Keep fetching pages until we have at least 10 fresh items (up to 15 pages).
+    for (let p = startPage; p < startPage + 15 && out.length < 10; p++) {
       const batch = await fetchPage(p);
       for (const it of batch) {
-        if (!seen.has(`${it.media_type}:${it.id}`)) out.push(it);
+        const key = `${it.media_type}:${it.id}`;
+        if (!seen.has(key)) {
+          out.push(it);
+          seen.add(key);
+        }
       }
       if (batch.length === 0) break;
     }

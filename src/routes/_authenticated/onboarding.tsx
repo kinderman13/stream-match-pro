@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { tmdbOnboardingFeed } from "@/lib/tmdb.functions";
 import { upsertRating, completeOnboarding, addInteraction } from "@/lib/user-data.functions";
@@ -39,6 +39,18 @@ function Onboarding() {
   const [ratingOpen, setRatingOpen] = useState(false);
   const [ratingValue, setRatingValue] = useState<number | null>(null);
   const [ratingAction, setRatingAction] = useState<"like" | "watched">("like");
+  // Session memory: every item shown this session — never re-show.
+  const sessionSeenRef = useRef<Set<string>>(new Set<string>());
+  const loadingRef = useRef<boolean>(false);
+  // Diversity: rotate sort + alternate movie/tv when no provider filter.
+  const sortRotation = [
+    "popularity.desc",
+    "vote_average.desc",
+    "primary_release_date.desc",
+    "vote_count.desc",
+    "primary_release_date.asc",
+    "revenue.desc",
+  ];
 
   useEffect(() => {
     let mt: "movie" | "tv" | null = null;
@@ -54,12 +66,35 @@ function Onboarding() {
   }, []);
 
   async function load(p: number, reset = false, mt?: "movie" | "tv") {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
       const useMt = mt ?? mediaType ?? undefined;
-      const r = (await feed({ data: { page: p, mediaType: useMt ?? undefined } })) as Item[];
-      setItems((prev) => (reset ? r : [...prev, ...r]));
+      const sortBy = sortRotation[(p - 1) % sortRotation.length];
+      const exclude = Array.from(sessionSeenRef.current);
+      const r = (await feed({ data: { page: p, mediaType: useMt ?? undefined, excludeIds: exclude, sortBy } })) as Item[];
+      // Filter against in-flight session memory and shuffle a bit to avoid genre streaks.
+      const fresh = r.filter((it) => {
+        const k = `${it.media_type}:${it.id}`;
+        if (sessionSeenRef.current.has(k)) return false;
+        sessionSeenRef.current.add(k);
+        return true;
+      });
+      // Light shuffle for diversity (Fisher-Yates on small batch).
+      for (let i = fresh.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [fresh[i], fresh[j]] = [fresh[j], fresh[i]];
+      }
+      setItems((prev) => (reset ? fresh : [...prev, ...fresh]));
       setPage(p + 1);
+      // If we still didn't get enough, recurse one more time with next page.
+      if (fresh.length < 5 && p < 30) {
+        loadingRef.current = false;
+        await load(p + 1, false, useMt);
+        return;
+      }
     } catch (e) { console.error(e); }
+    finally { loadingRef.current = false; }
   }
 
   useEffect(() => {
