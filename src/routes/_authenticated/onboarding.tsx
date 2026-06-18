@@ -40,8 +40,8 @@ function Onboarding() {
   const [ratingValue, setRatingValue] = useState<number | null>(null);
   const [ratingAction, setRatingAction] = useState<"like" | "watched">("like");
   // Session memory: every item shown this session — never re-show.
-  const sessionSeenRef = useRef<Set<string>>(new Set());
-  const loadingRef = useRef(false);
+  const sessionSeenRef = useRef<Set<string>>(new Set<string>());
+  const loadingRef = useRef<boolean>(false);
   // Diversity: rotate sort + alternate movie/tv when no provider filter.
   const sortRotation = [
     "popularity.desc",
