@@ -83,7 +83,7 @@ export function Header() {
         {user ? (
           <>
             {/* Desktop nav */}
-            <nav className="hidden items-center gap-1 text-sm md:flex">
+            <nav className="hidden items-center gap-1 text-sm lg:flex">
               <Link to="/providers" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Início</Link>
               <Link to="/recommendations" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Recomendações</Link>
               <Link to="/list" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Minha Lista</Link>
@@ -122,7 +122,7 @@ export function Header() {
             </nav>
 
             {/* Mobile: avatar + hamburger */}
-            <div className="flex items-center gap-2 md:hidden">
+            <div className="flex items-center gap-2 lg:hidden">
               <Avatar className="h-8 w-8 shrink-0 border border-border">
                 <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
                   {initials}
