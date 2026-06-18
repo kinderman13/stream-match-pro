@@ -14,6 +14,7 @@ import {
   adminBlockUser, adminDeleteUser,
   adminListReports, adminResolveReport,
   adminListAlerts, adminResolveAlert, adminRunAlertChecks,
+  adminGetDnaStats,
 } from "@/lib/admin.functions";
 import { adminListTickets, adminUpdateTicketStatus, getTicket, replyTicket } from "@/lib/support.functions";
 
@@ -51,8 +52,10 @@ function AdminPage() {
   const resolveAlertFn = useServerFn(adminResolveAlert);
   const runChecksFn = useServerFn(adminRunAlertChecks);
   const qc = useQueryClient();
-  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "support" | "moderation" | "alerts" | "logs" | "settings";
+  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "support" | "moderation" | "alerts" | "logs" | "settings" | "dna";
   const [tab, setTab] = useState<Tab>("overview");
+  const dnaStatsFn = useServerFn(adminGetDnaStats);
+  const dnaStatsQ = useQuery({ queryKey: ["admin-dna"], queryFn: () => dnaStatsFn(), enabled: tab === "dna" });
 
   const ticketsListFn = useServerFn(adminListTickets);
   const ticketGetFn = useServerFn(getTicket);
@@ -79,6 +82,7 @@ function AdminPage() {
     { id: "moderation", label: "Moderação" },
     { id: "alerts", label: "Alertas" },
     { id: "logs", label: "Logs" },
+    { id: "dna", label: "DNA" },
     { id: "settings", label: "Configurações" },
   ];
 
@@ -126,6 +130,7 @@ function AdminPage() {
         {tab === "alerts" && <Alerts q={alertsQ} resolve={resolveAlertFn} runChecks={runChecksFn} qc={qc} />}
         {tab === "logs" && <Logs q={logsQ} />}
         {tab === "settings" && <Settings q={settingsQ} update={updateSettingFn} qc={qc} />}
+        {tab === "dna" && <DnaStats q={dnaStatsQ} />}
       </div>
     </div>
   );
