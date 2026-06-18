@@ -13,6 +13,7 @@ import {
   Menu,
   Home,
   Clapperboard,
+  Dna,
 } from "lucide-react";
 import { useSupport } from "@/components/SupportPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,6 +67,7 @@ export function Header() {
   const mobileLinks = [
     { to: "/providers" as const, label: "Início", icon: Home },
     { to: "/recommendations" as const, label: "Minhas Recomendações", icon: Clapperboard },
+    { to: "/dna" as const, label: "DNA Cinematográfico", icon: Dna },
     { to: "/list" as const, label: "Minha Lista", icon: List },
     { to: "/history" as const, label: "Histórico", icon: History },
     { to: "/profile" as const, label: "Meu Perfil", icon: User },
@@ -86,6 +88,7 @@ export function Header() {
             <nav className="hidden items-center gap-1 text-sm lg:flex">
               <Link to="/providers" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Início</Link>
               <Link to="/recommendations" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Recomendações</Link>
+              <Link to="/dna" className="inline-flex items-center gap-1 rounded px-3 py-1.5 font-semibold text-primary hover:bg-secondary"><Dna className="h-4 w-4" />DNA</Link>
               <Link to="/list" className="rounded px-3 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">Minha Lista</Link>
               {rolesQ.data?.isAdmin && (
                 <Link to="/admin" className="rounded px-3 py-1.5 text-primary hover:bg-secondary">Admin</Link>
@@ -106,6 +109,7 @@ export function Header() {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild><Link to="/profile"><User className="mr-2 h-4 w-4" />Meu Perfil</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to="/dna"><Dna className="mr-2 h-4 w-4" />DNA Cinematográfico</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link to="/list"><List className="mr-2 h-4 w-4" />Minha Lista</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link to="/history"><History className="mr-2 h-4 w-4" />Histórico</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link to="/providers"><SlidersHorizontal className="mr-2 h-4 w-4" />Preferências</Link></DropdownMenuItem>

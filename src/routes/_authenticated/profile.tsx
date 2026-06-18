@@ -49,6 +49,18 @@ function ProfilePage() {
         </Link>
       </div>
 
+      <Link
+        to="/dna"
+        className="mt-6 flex items-center gap-4 rounded-2xl border border-primary/40 bg-gradient-to-r from-primary/15 via-card to-card p-4 transition hover:border-primary"
+      >
+        <div className="text-3xl">🧬</div>
+        <div className="min-w-0 flex-1">
+          <div className="font-bold">Descobrir Meu DNA Cinematográfico</div>
+          <div className="text-xs text-muted-foreground">Perfil, gêneros, troféus e compatibilidade — gerado a partir do seu histórico.</div>
+        </div>
+        <span className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">Revelar</span>
+      </Link>
+
       <h2 className="mt-8 text-lg font-semibold">Estatísticas</h2>
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Filmes avaliados" value={s.data?.moviesRated ?? 0} />

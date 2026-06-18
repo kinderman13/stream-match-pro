@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { tmdbRecommendations } from "@/lib/tmdb.functions";
@@ -66,6 +66,18 @@ function Recs() {
           <button onClick={() => load(false)} className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground">Atualizar</button>
         </div>
       </div>
+
+      <Link
+        to="/dna"
+        className="mt-4 flex items-center gap-3 rounded-xl border border-primary/40 bg-gradient-to-r from-primary/15 via-card to-card p-3 transition hover:border-primary"
+      >
+        <span className="text-2xl">🧬</span>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold">Descobrir Meu DNA Cinematográfico</div>
+          <div className="text-xs text-muted-foreground">Veja seu perfil completo e compartilhe com os amigos.</div>
+        </div>
+        <span className="rounded-md bg-primary px-2.5 py-1 text-xs font-bold text-primary-foreground">Revelar</span>
+      </Link>
 
       {loading && <div className="py-10 text-center text-sm text-muted-foreground">Calculando seu match...</div>}
       {!loading && items.length === 0 && (
