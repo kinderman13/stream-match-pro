@@ -109,6 +109,7 @@ export function Header() {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild><Link to="/profile"><User className="mr-2 h-4 w-4" />Meu Perfil</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to="/dna"><Dna className="mr-2 h-4 w-4" />DNA Cinematográfico</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link to="/list"><List className="mr-2 h-4 w-4" />Minha Lista</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link to="/history"><History className="mr-2 h-4 w-4" />Histórico</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link to="/providers"><SlidersHorizontal className="mr-2 h-4 w-4" />Preferências</Link></DropdownMenuItem>
