@@ -67,6 +67,7 @@ export function Header() {
   const mobileLinks = [
     { to: "/providers" as const, label: "Início", icon: Home },
     { to: "/recommendations" as const, label: "Minhas Recomendações", icon: Clapperboard },
+    { to: "/dna" as const, label: "DNA Cinematográfico", icon: Dna },
     { to: "/list" as const, label: "Minha Lista", icon: List },
     { to: "/history" as const, label: "Histórico", icon: History },
     { to: "/profile" as const, label: "Meu Perfil", icon: User },
