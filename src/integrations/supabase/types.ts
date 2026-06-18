@@ -336,7 +336,7 @@ export type Database = {
           level: string
           message: string
           metadata: Json
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           category: string
@@ -345,7 +345,7 @@ export type Database = {
           level?: string
           message: string
           metadata?: Json
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           category?: string
@@ -354,7 +354,7 @@ export type Database = {
           level?: string
           message?: string
           metadata?: Json
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
