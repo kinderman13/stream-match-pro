@@ -14,6 +14,7 @@ import {
   adminBlockUser, adminDeleteUser,
   adminListReports, adminResolveReport,
   adminListAlerts, adminResolveAlert, adminRunAlertChecks,
+  adminGetDnaStats,
 } from "@/lib/admin.functions";
 import { adminListTickets, adminUpdateTicketStatus, getTicket, replyTicket } from "@/lib/support.functions";
 
@@ -51,8 +52,10 @@ function AdminPage() {
   const resolveAlertFn = useServerFn(adminResolveAlert);
   const runChecksFn = useServerFn(adminRunAlertChecks);
   const qc = useQueryClient();
-  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "support" | "moderation" | "alerts" | "logs" | "settings";
+  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "support" | "moderation" | "alerts" | "logs" | "settings" | "dna";
   const [tab, setTab] = useState<Tab>("overview");
+  const dnaStatsFn = useServerFn(adminGetDnaStats);
+  const dnaStatsQ = useQuery({ queryKey: ["admin-dna"], queryFn: () => dnaStatsFn(), enabled: tab === "dna" });
 
   const ticketsListFn = useServerFn(adminListTickets);
   const ticketGetFn = useServerFn(getTicket);
@@ -79,6 +82,7 @@ function AdminPage() {
     { id: "moderation", label: "Moderação" },
     { id: "alerts", label: "Alertas" },
     { id: "logs", label: "Logs" },
+    { id: "dna", label: "DNA" },
     { id: "settings", label: "Configurações" },
   ];
 
@@ -126,6 +130,7 @@ function AdminPage() {
         {tab === "alerts" && <Alerts q={alertsQ} resolve={resolveAlertFn} runChecks={runChecksFn} qc={qc} />}
         {tab === "logs" && <Logs q={logsQ} />}
         {tab === "settings" && <Settings q={settingsQ} update={updateSettingFn} qc={qc} />}
+        {tab === "dna" && <DnaStats q={dnaStatsQ} />}
       </div>
     </div>
   );
@@ -993,6 +998,69 @@ function Support({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function DnaStats({ q }: { q: any }) {
+  if (q.isLoading) return <div className="text-sm text-muted-foreground">Carregando…</div>;
+  const d = q.data;
+  if (!d) return null;
+  const ANIMAL_LABEL: Record<string, string> = {
+    lion: "🦁 Leão", owl: "🦉 Coruja", wolf: "🐺 Lobo", eagle: "🦅 Águia", bear: "🐻 Urso",
+    dolphin: "🐬 Golfinho", fox: "🦊 Raposa", tiger: "🐯 Tigre", penguin: "🐧 Pinguim", dragon: "🐲 Dragão",
+  };
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Total de DNAs gerados" value={d.totalDnas} />
+        <Kpi label="Compartilhamentos" value={d.totalShares} />
+        <Kpi label="Taxa de share" value={`${d.shareRate}%`} />
+        <Kpi label="Animal mais comum" value={ANIMAL_LABEL[d.mostCommonAnimal] ?? "—"} />
+      </div>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h3 className="mb-3 font-bold">Animais por frequência</h3>
+          <ul className="space-y-1 text-sm">
+            {d.animals.map(([k, n]: [string, number]) => (
+              <li key={k} className="flex justify-between"><span>{ANIMAL_LABEL[k] ?? k}</span><span className="font-mono">{n}</span></li>
+            ))}
+          </ul>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h3 className="mb-3 font-bold">Canais de compartilhamento</h3>
+          <ul className="space-y-1 text-sm">
+            {d.channels.map(([k, n]: [string, number]) => (
+              <li key={k} className="flex justify-between"><span>{k}</span><span className="font-mono">{n}</span></li>
+            ))}
+          </ul>
+          {d.channels.length === 0 && <div className="text-xs text-muted-foreground">Nenhum compartilhamento ainda.</div>}
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h3 className="mb-3 font-bold">Raridades</h3>
+          <ul className="space-y-1 text-sm">
+            {d.rarities.map(([k, n]: [string, number]) => (
+              <li key={k} className="flex justify-between"><span>{k}</span><span className="font-mono">{n}</span></li>
+            ))}
+          </ul>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h3 className="mb-3 font-bold">Mais raro / mais compartilhado</h3>
+          <div className="space-y-1 text-sm">
+            <div>Mais raro: <strong>{ANIMAL_LABEL[d.rarestAnimal] ?? "—"}</strong></div>
+            <div>Mais compartilhado: <strong>{ANIMAL_LABEL[d.mostSharedAnimal] ?? "—"}</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Kpi({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 text-2xl font-black">{value}</div>
     </div>
   );
 }

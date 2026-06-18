@@ -125,6 +125,75 @@ export type Database = {
         }
         Relationships: []
       }
+      dna_results: {
+        Row: {
+          animal_key: string | null
+          character_key: string | null
+          percentile_analytics: number | null
+          percentile_quality: number | null
+          percentile_rarity: number | null
+          profile_title: string | null
+          rarity: string | null
+          total_interactions: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          animal_key?: string | null
+          character_key?: string | null
+          percentile_analytics?: number | null
+          percentile_quality?: number | null
+          percentile_rarity?: number | null
+          profile_title?: string | null
+          rarity?: string | null
+          total_interactions?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          animal_key?: string | null
+          character_key?: string | null
+          percentile_analytics?: number | null
+          percentile_quality?: number | null
+          percentile_rarity?: number | null
+          profile_title?: string | null
+          rarity?: string | null
+          total_interactions?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      dna_shares: {
+        Row: {
+          animal_key: string | null
+          channel: string
+          character_key: string | null
+          created_at: string
+          id: string
+          rarity: string | null
+          user_id: string
+        }
+        Insert: {
+          animal_key?: string | null
+          channel: string
+          character_key?: string | null
+          created_at?: string
+          id?: string
+          rarity?: string | null
+          user_id: string
+        }
+        Update: {
+          animal_key?: string | null
+          channel?: string
+          character_key?: string | null
+          created_at?: string
+          id?: string
+          rarity?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       interactions: {
         Row: {
           action: string
