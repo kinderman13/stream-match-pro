@@ -115,7 +115,7 @@ function ProgressTile({ label, cur, target }: { label: string; cur: number; targ
   );
 }
 
-function Reveal({ d, userName }: { d: NonNullable<ReturnType<typeof useQuery<any, any>>["data"]>; userName: string }) {
+function Reveal({ d, userName }: { d: any; userName: string }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   async function share() {
