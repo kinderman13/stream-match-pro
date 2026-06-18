@@ -720,3 +720,36 @@ export const adminRunAlertChecks = createServerFn({ method: "POST" })
     }
     return { checked: drafts.length, created };
   });
+
+export const adminGetDnaStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [resultsRes, sharesRes] = await Promise.all([
+      supabaseAdmin.from("dna_results").select("animal_key, character_key, rarity"),
+      supabaseAdmin.from("dna_shares").select("channel, animal_key, character_key, created_at"),
+    ]);
+    const results = resultsRes.data ?? [];
+    const shares = sharesRes.data ?? [];
+    const tally = <T extends string>(rows: any[], key: string) => {
+      const m = new Map<T, number>();
+      for (const r of rows) { const v = r[key]; if (!v) continue; m.set(v, (m.get(v) ?? 0) + 1); }
+      return [...m.entries()].sort((a, b) => b[1] - a[1]);
+    };
+    const animals = tally(results, "animal_key");
+    const rarities = tally(results, "rarity");
+    const channels = tally(shares, "channel");
+    const sharedAnimals = tally(shares, "animal_key");
+    return {
+      totalDnas: results.length,
+      totalShares: shares.length,
+      shareRate: results.length ? Math.round((shares.length / results.length) * 100) : 0,
+      mostCommonAnimal: animals[0]?.[0] ?? null,
+      rarestAnimal: animals[animals.length - 1]?.[0] ?? null,
+      mostSharedAnimal: sharedAnimals[0]?.[0] ?? null,
+      animals,
+      rarities,
+      channels,
+    };
+  });
