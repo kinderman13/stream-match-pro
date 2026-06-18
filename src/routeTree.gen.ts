@@ -23,6 +23,7 @@ import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedListRouteImport } from './routes/_authenticated/list'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
+import { Route as AuthenticatedDnaRouteImport } from './routes/_authenticated/dna'
 import { Route as AuthenticatedChooseRouteImport } from './routes/_authenticated/choose'
 import { Route as AuthenticatedCatalogRouteImport } from './routes/_authenticated/catalog'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
@@ -97,6 +98,11 @@ const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDnaRoute = AuthenticatedDnaRouteImport.update({
+  id: '/dna',
+  path: '/dna',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedChooseRoute = AuthenticatedChooseRouteImport.update({
   id: '/choose',
   path: '/choose',
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/catalog': typeof AuthenticatedCatalogRoute
   '/choose': typeof AuthenticatedChooseRoute
+  '/dna': typeof AuthenticatedDnaRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/list': typeof AuthenticatedListRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -141,6 +148,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/catalog': typeof AuthenticatedCatalogRoute
   '/choose': typeof AuthenticatedChooseRoute
+  '/dna': typeof AuthenticatedDnaRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/list': typeof AuthenticatedListRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/catalog': typeof AuthenticatedCatalogRoute
   '/_authenticated/choose': typeof AuthenticatedChooseRoute
+  '/_authenticated/dna': typeof AuthenticatedDnaRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/list': typeof AuthenticatedListRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/catalog'
     | '/choose'
+    | '/dna'
     | '/history'
     | '/list'
     | '/onboarding'
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/catalog'
     | '/choose'
+    | '/dna'
     | '/history'
     | '/list'
     | '/onboarding'
@@ -218,6 +229,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/catalog'
     | '/_authenticated/choose'
+    | '/_authenticated/dna'
     | '/_authenticated/history'
     | '/_authenticated/list'
     | '/_authenticated/onboarding'
@@ -337,6 +349,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHistoryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dna': {
+      id: '/_authenticated/dna'
+      path: '/dna'
+      fullPath: '/dna'
+      preLoaderRoute: typeof AuthenticatedDnaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/choose': {
       id: '/_authenticated/choose'
       path: '/choose'
@@ -365,6 +384,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedCatalogRoute: typeof AuthenticatedCatalogRoute
   AuthenticatedChooseRoute: typeof AuthenticatedChooseRoute
+  AuthenticatedDnaRoute: typeof AuthenticatedDnaRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedListRoute: typeof AuthenticatedListRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
@@ -378,6 +398,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedCatalogRoute: AuthenticatedCatalogRoute,
   AuthenticatedChooseRoute: AuthenticatedChooseRoute,
+  AuthenticatedDnaRoute: AuthenticatedDnaRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedListRoute: AuthenticatedListRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
