@@ -1100,3 +1100,38 @@ function DnaStats({ q }: { q: any }) {
   );
 }
 
+
+function ResetStats({ q }: { q: { isLoading: boolean; error: unknown; data?: { total: number; recent: { userId: string | null; createdAt: string }[] } } }) {
+  if (q.isLoading) return <div className="text-muted-foreground">Carregando...</div>;
+  if (q.error) return <div className="text-destructive">Erro: {(q.error as Error).message}</div>;
+  const d = q.data;
+  if (!d) return null;
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-border bg-card p-5">
+        <div className="text-sm text-muted-foreground">Resets executados (total)</div>
+        <div className="mt-1 text-3xl font-bold">{d.total}</div>
+      </div>
+      <div className="rounded-lg border border-border bg-card p-5">
+        <h3 className="font-semibold">Resets recentes</h3>
+        {d.recent.length === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground">Nenhum reset registrado ainda.</p>
+        ) : (
+          <table className="mt-3 w-full text-sm">
+            <thead className="text-left text-xs text-muted-foreground">
+              <tr><th className="py-2">Usuário</th><th className="py-2">Data</th></tr>
+            </thead>
+            <tbody>
+              {d.recent.map((r, i) => (
+                <tr key={i} className="border-t border-border">
+                  <td className="py-2 font-mono text-xs">{r.userId ?? "—"}</td>
+                  <td className="py-2">{new Date(r.createdAt).toLocaleString("pt-BR")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
