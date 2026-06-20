@@ -187,7 +187,7 @@ export const adminGetDashboard = createServerFn({ method: "GET" })
       supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", today),
       supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", wStart.toISOString()),
       supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", mStart),
-      supabaseAdmin.from("interactions").select("user_id, action, media_type, tmdb_id, created_at"),
+      supabaseAdmin.from("interactions").select("user_id, action, media_type, tmdb_id, provider_id, created_at"),
       supabaseAdmin.from("ratings").select("user_id, rating, tmdb_id, media_type, title, poster_path, created_at"),
       supabaseAdmin.from("watchlist").select("id", { count: "exact", head: true }),
       supabaseAdmin.from("recommendation_history").select("id, user_id, created_at", { count: "exact" }),
