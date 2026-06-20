@@ -53,10 +53,12 @@ function AdminPage() {
   const resolveAlertFn = useServerFn(adminResolveAlert);
   const runChecksFn = useServerFn(adminRunAlertChecks);
   const qc = useQueryClient();
-  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "support" | "moderation" | "alerts" | "logs" | "settings" | "dna";
+  type Tab = "overview" | "users" | "rankings" | "platforms" | "recs" | "retention" | "support" | "moderation" | "alerts" | "logs" | "settings" | "dna" | "resets";
   const [tab, setTab] = useState<Tab>("overview");
   const dnaStatsFn = useServerFn(adminGetDnaStats);
   const dnaStatsQ = useQuery({ queryKey: ["admin-dna"], queryFn: () => dnaStatsFn(), enabled: tab === "dna" });
+  const resetStatsFn = useServerFn(adminGetResetStats);
+  const resetStatsQ = useQuery({ queryKey: ["admin-resets"], queryFn: () => resetStatsFn(), enabled: tab === "resets" });
 
   const ticketsListFn = useServerFn(adminListTickets);
   const ticketGetFn = useServerFn(getTicket);
