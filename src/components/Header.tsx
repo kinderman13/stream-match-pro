@@ -1,4 +1,5 @@
 import { useState } from "react";
+import logoAsset from "@/assets/streammatch-logo.png.asset.json";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -77,9 +78,8 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 w-full max-w-full overflow-x-hidden border-b border-border/60 bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:px-4">
-        <Link to="/" className="flex shrink-0 items-center gap-1">
-          <span className="text-lg font-black tracking-tight text-primary sm:text-xl">STREAM</span>
-          <span className="text-lg font-black tracking-tight text-foreground sm:text-xl">MATCH</span>
+        <Link to="/" className="flex shrink-0 items-center" aria-label="StreamMatch — Início">
+          <img src={logoAsset.url} alt="StreamMatch" className="h-8 w-auto sm:h-9" />
         </Link>
 
         {user ? (
@@ -142,9 +142,8 @@ export function Header() {
                 <SheetContent side="left" className="w-[85vw] max-w-sm border-border bg-background p-0">
                   <div className="flex h-full flex-col">
                     <div className="border-b border-border/60 px-5 py-5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-black tracking-tight text-primary">STREAM</span>
-                        <span className="text-lg font-black tracking-tight text-foreground">MATCH</span>
+                      <div className="flex items-center">
+                        <img src={logoAsset.url} alt="StreamMatch" className="h-8 w-auto" />
                       </div>
                       <div className="mt-3 flex items-center gap-3">
                         <Avatar className="h-10 w-10 shrink-0 border border-border">
