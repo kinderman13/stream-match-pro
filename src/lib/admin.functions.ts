@@ -787,3 +787,18 @@ export const adminGetDnaStats = createServerFn({ method: "GET" })
       channels,
     };
   });
+
+export const adminGetResetStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ count: total }, recentRes] = await Promise.all([
+      supabaseAdmin.from("system_logs").select("id", { count: "exact", head: true }).eq("category", "reset_choices"),
+      supabaseAdmin.from("system_logs").select("user_id, created_at").eq("category", "reset_choices").order("created_at", { ascending: false }).limit(50),
+    ]);
+    return {
+      total: total ?? 0,
+      recent: (recentRes.data ?? []).map((r) => ({ userId: r.user_id as string | null, createdAt: r.created_at as string })),
+    };
+  });

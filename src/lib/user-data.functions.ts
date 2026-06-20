@@ -172,3 +172,35 @@ export const listWatchlist = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return data || [];
   });
+
+export const resetUserChoices = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const tables = [
+      "ratings",
+      "interactions",
+      "watchlist",
+      "recommendation_history",
+      "dna_results",
+      "dna_shares",
+    ] as const;
+    for (const t of tables) {
+      const { error } = await supabase.from(t).delete().eq("user_id", userId);
+      if (error) throw new Error(`${t}: ${error.message}`);
+    }
+    const { error: prefErr } = await supabase.from("user_preferences").upsert({
+      user_id: userId,
+      onboarding_completed: false,
+      selected_providers: [],
+    }, { onConflict: "user_id" });
+    if (prefErr) throw new Error(prefErr.message);
+    await supabase.from("system_logs").insert({
+      user_id: userId,
+      category: "reset_choices",
+      level: "info",
+      message: "Usuário resetou preferências e histórico.",
+      metadata: { tables_cleared: tables } as never,
+    });
+    return { ok: true };
+  });
