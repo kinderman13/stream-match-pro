@@ -21,6 +21,8 @@ export interface ScoredRecommendation {
   match: number; // 0-100
   providers: { provider_id: number; provider_name: string }[];
   genres: string[];
+  trailerKey: string | null; // YouTube key
+  tmdbWatchUrl: string; // canonical fallback
 }
 
 export async function buildRecommendations(opts: {
