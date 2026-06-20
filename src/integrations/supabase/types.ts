@@ -200,6 +200,7 @@ export type Database = {
           created_at: string
           id: string
           media_type: string
+          provider_id: number | null
           tmdb_id: number
           user_id: string
         }
@@ -208,6 +209,7 @@ export type Database = {
           created_at?: string
           id?: string
           media_type: string
+          provider_id?: number | null
           tmdb_id: number
           user_id: string
         }
@@ -216,6 +218,7 @@ export type Database = {
           created_at?: string
           id?: string
           media_type?: string
+          provider_id?: number | null
           tmdb_id?: number
           user_id?: string
         }
