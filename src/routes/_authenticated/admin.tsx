@@ -15,6 +15,7 @@ import {
   adminListReports, adminResolveReport,
   adminListAlerts, adminResolveAlert, adminRunAlertChecks,
   adminGetDnaStats,
+  adminGetResetStats,
 } from "@/lib/admin.functions";
 import { adminListTickets, adminUpdateTicketStatus, getTicket, replyTicket } from "@/lib/support.functions";
 
