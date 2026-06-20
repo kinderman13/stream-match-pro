@@ -106,11 +106,12 @@ export const completeOnboarding = createServerFn({ method: "POST" })
 
 export const addInteraction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { tmdbId: number; mediaType: "movie" | "tv"; action: "like" | "dislike" | "watched" | "save" | "skip" }) =>
+  .inputValidator((d: { tmdbId: number; mediaType: "movie" | "tv"; action: "like" | "dislike" | "watched" | "save" | "skip" | "watch_click" | "trailer_click"; providerId?: number | null }) =>
     z.object({
       tmdbId: z.number().int(),
       mediaType: MediaTypeSchema,
-      action: z.enum(["like", "dislike", "watched", "save", "skip"]),
+      action: z.enum(["like", "dislike", "watched", "save", "skip", "watch_click", "trailer_click"]),
+      providerId: z.number().int().nullable().optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -119,6 +120,7 @@ export const addInteraction = createServerFn({ method: "POST" })
       tmdb_id: data.tmdbId,
       media_type: data.mediaType,
       action: data.action,
+      provider_id: data.providerId ?? null,
     });
     if (error) throw new Error(error.message);
     return { ok: true };

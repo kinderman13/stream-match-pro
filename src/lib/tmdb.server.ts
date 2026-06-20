@@ -131,7 +131,7 @@ export async function getSimilar(mediaType: MediaType, id: number, page = 1): Pr
 }
 
 export async function getDetails(mediaType: MediaType, id: number) {
-  return tmdbFetch(`/${mediaType}/${id}`, { append_to_response: "credits,watch/providers,recommendations" });
+  return tmdbFetch(`/${mediaType}/${id}`, { append_to_response: "credits,watch/providers,recommendations,videos" });
 }
 
 export async function getWatchProviders(mediaType: MediaType, id: number): Promise<number[]> {

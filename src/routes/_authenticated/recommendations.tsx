@@ -2,8 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { tmdbRecommendations } from "@/lib/tmdb.functions";
-import { addInteraction, addToWatchlist, upsertRating } from "@/lib/user-data.functions";
+import { addInteraction, addToWatchlist, upsertRating, getUserState } from "@/lib/user-data.functions";
 import { RatingDialog } from "@/components/RatingDialog";
+import { buildProviderLink, trailerUrl } from "@/lib/watch-links";
 
 export const Route = createFileRoute("/_authenticated/recommendations")({
   component: Recs,
@@ -13,6 +14,7 @@ interface Rec {
   id: number; media_type: "movie" | "tv"; title: string; poster_path: string | null;
   year: string; vote_average: number; overview: string; match: number;
   providers: { provider_id: number; provider_name: string }[]; genres: string[];
+  trailerKey: string | null; tmdbWatchUrl: string;
 }
 
 function Recs() {
@@ -20,10 +22,13 @@ function Recs() {
   const interact = useServerFn(addInteraction);
   const save = useServerFn(addToWatchlist);
   const rate = useServerFn(upsertRating);
+  const stateFn = useServerFn(getUserState);
 
   const [items, setItems] = useState<Rec[]>([]);
   const [loading, setLoading] = useState(true);
   const [target, setTarget] = useState<Rec | null>(null);
+  const [trailer, setTrailer] = useState<{ key: string; title: string } | null>(null);
+  const [selectedProviders, setSelectedProviders] = useState<number[]>([]);
 
   async function load(surprise = false) {
     setLoading(true);
@@ -39,7 +44,11 @@ function Recs() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { load(false); /* eslint-disable-line */ }, []);
+  useEffect(() => {
+    load(false);
+    stateFn().then((s) => setSelectedProviders(s.selectedProviders || [])).catch(() => {});
+    /* eslint-disable-next-line */
+  }, []);
 
   async function react(item: Rec, action: "like" | "dislike" | "watched" | "save") {
     await interact({ data: { tmdbId: item.id, mediaType: item.media_type, action } });
@@ -49,6 +58,23 @@ function Recs() {
     if (action === "watched" || action === "dislike") {
       setItems((prev) => prev.filter((x) => !(x.id === item.id && x.media_type === item.media_type)));
     }
+  }
+
+  async function watchNow(item: Rec) {
+    const link = buildProviderLink(item.providers, item.title, item.year, selectedProviders);
+    const url = link?.isDirect ? link.url : item.tmdbWatchUrl;
+    const providerId = link?.providerId ?? null;
+    // fire-and-forget tracking
+    interact({ data: { tmdbId: item.id, mediaType: item.media_type, action: "watch_click", providerId } }).catch(() => {});
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  function openTrailer(item: Rec) {
+    if (!item.trailerKey) return;
+    interact({ data: { tmdbId: item.id, mediaType: item.media_type, action: "trailer_click" } }).catch(() => {});
+    // Open YouTube in a new tab; on mobile this universal-links into the YouTube app.
+    window.open(trailerUrl(item.trailerKey), "_blank", "noopener,noreferrer");
+    setTrailer({ key: item.trailerKey, title: item.title });
   }
 
   async function saveRating(rating: number) {
@@ -87,41 +113,105 @@ function Recs() {
       )}
 
       <div className="mt-6 space-y-4">
-        {items.map((it) => (
-          <div key={`${it.media_type}:${it.id}`} className="flex gap-4 rounded-xl border border-border bg-card p-3 poster-shadow">
-            <div className="h-36 w-24 flex-shrink-0 overflow-hidden rounded-md bg-secondary sm:h-44 sm:w-28">
-              {it.poster_path ? (
-                <img src={`https://image.tmdb.org/t/p/w342${it.poster_path}`} alt={it.title} className="h-full w-full object-cover" />
-              ) : null}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-base font-bold sm:text-lg">{it.title} <span className="font-normal text-muted-foreground">({it.year})</span></div>
-                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                    <span>★ {it.vote_average.toFixed(1)}</span>
-                    {it.genres.slice(0, 3).map((g) => <span key={g}>{g}</span>)}
+        {items.map((it) => {
+          const link = buildProviderLink(it.providers, it.title, it.year, selectedProviders);
+          const hasDirect = !!link?.isDirect;
+          const watchLabel = hasDirect ? `▶️ Assistir no ${link!.providerName}` : "▶️ Assistir neste streaming";
+          return (
+            <div key={`${it.media_type}:${it.id}`} className="flex gap-4 rounded-xl border border-border bg-card p-3 poster-shadow">
+              <div className="h-36 w-24 flex-shrink-0 overflow-hidden rounded-md bg-secondary sm:h-44 sm:w-28">
+                {it.poster_path ? (
+                  <img src={`https://image.tmdb.org/t/p/w342${it.poster_path}`} alt={it.title} className="h-full w-full object-cover" />
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-base font-bold sm:text-lg">{it.title} <span className="font-normal text-muted-foreground">({it.year})</span></div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>★ {it.vote_average.toFixed(1)}</span>
+                      {it.genres.slice(0, 3).map((g) => <span key={g}>{g}</span>)}
+                    </div>
                   </div>
+                  <div className="rounded-md bg-match px-2 py-1 text-sm font-black text-black">{it.match}%</div>
                 </div>
-                <div className="rounded-md bg-match px-2 py-1 text-sm font-black text-black">{it.match}%</div>
-              </div>
-              <p className="mt-2 line-clamp-3 text-xs text-muted-foreground sm:text-sm">{it.overview}</p>
-              {it.providers.length > 0 && (
-                <div className="mt-2 text-xs text-muted-foreground">📺 {it.providers.map((p) => p.provider_name).join(", ")}</div>
-              )}
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                <button onClick={() => react(it, "like")} className="rounded-md border border-border bg-secondary px-2.5 py-1 text-xs hover:border-success" title="Gostei">👍</button>
-                <button onClick={() => react(it, "dislike")} className="rounded-md border border-border bg-secondary px-2.5 py-1 text-xs hover:border-destructive" title="Não gostei">👎</button>
-                <button onClick={() => react(it, "watched")} className="rounded-md border border-border bg-secondary px-2.5 py-1 text-xs hover:border-foreground" title="Já assisti">👀</button>
-                <button onClick={() => react(it, "save")} className="rounded-md border border-border bg-secondary px-2.5 py-1 text-xs hover:border-primary" title="Salvar">⭐ Salvar</button>
-                <button onClick={() => setTarget(it)} className="rounded-md border border-border bg-secondary px-2.5 py-1 text-xs hover:border-primary">Avaliar</button>
+                <p className="mt-2 line-clamp-3 text-xs text-muted-foreground sm:text-sm">{it.overview}</p>
+                {it.providers.length > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>📺 {it.providers.map((p) => p.provider_name).join(", ")}</span>
+                    {hasDirect && (
+                      <span className="rounded-md bg-success/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-success">
+                        ✅ Disponível agora
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Primary CTAs */}
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {it.providers.length > 0 && (
+                    <button
+                      onClick={() => watchNow(it)}
+                      className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90"
+                    >
+                      {watchLabel}
+                    </button>
+                  )}
+                  {it.trailerKey && (
+                    <button
+                      onClick={() => openTrailer(it)}
+                      className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-semibold hover:border-primary"
+                    >
+                      🎬 Ver Trailer
+                    </button>
+                  )}
+                  <button
+                    onClick={() => react(it, "save")}
+                    className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-semibold hover:border-primary"
+                  >
+                    ➕ Minha Lista
+                  </button>
+                </div>
+
+                {/* Secondary feedback */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <button onClick={() => react(it, "like")} className="rounded-md border border-border bg-secondary px-2.5 py-1 text-xs hover:border-success" title="Gostei">👍</button>
+                  <button onClick={() => react(it, "dislike")} className="rounded-md border border-border bg-secondary px-2.5 py-1 text-xs hover:border-destructive" title="Não gostei">👎</button>
+                  <button onClick={() => react(it, "watched")} className="rounded-md border border-border bg-secondary px-2.5 py-1 text-xs hover:border-foreground" title="Já assisti">👀</button>
+                  <button onClick={() => setTarget(it)} className="rounded-md border border-border bg-secondary px-2.5 py-1 text-xs hover:border-primary">Avaliar</button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <RatingDialog open={!!target} title={target?.title || ""} onClose={() => setTarget(null)} onSubmit={saveRating} />
+
+      {trailer && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setTrailer(null)}
+        >
+          <div className="relative w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setTrailer(null)}
+              className="absolute -top-10 right-0 text-sm font-semibold text-white"
+            >
+              ✕ Fechar
+            </button>
+            <div className="aspect-video w-full overflow-hidden rounded-lg bg-black">
+              <iframe
+                src={`https://www.youtube.com/embed/${trailer.key}?autoplay=1`}
+                title={trailer.title}
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen
+                className="h-full w-full"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

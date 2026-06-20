@@ -187,7 +187,7 @@ export const adminGetDashboard = createServerFn({ method: "GET" })
       supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", today),
       supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", wStart.toISOString()),
       supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", mStart),
-      supabaseAdmin.from("interactions").select("user_id, action, media_type, tmdb_id, created_at"),
+      supabaseAdmin.from("interactions").select("user_id, action, media_type, tmdb_id, provider_id, created_at"),
       supabaseAdmin.from("ratings").select("user_id, rating, tmdb_id, media_type, title, poster_path, created_at"),
       supabaseAdmin.from("watchlist").select("id", { count: "exact", head: true }),
       supabaseAdmin.from("recommendation_history").select("id, user_id, created_at", { count: "exact" }),
@@ -336,6 +336,40 @@ export const adminGetDashboard = createServerFn({ method: "GET" })
         watchedRate: Math.round(watchedRate * 10) / 10,
         conversion: Math.round(conversion * 10) / 10,
       },
+      watchNow: (() => {
+        const watchClicks = interactions.filter((i: any) => i.action === "watch_click");
+        const trailerClicks = interactions.filter((i: any) => i.action === "trailer_click").length;
+        const totalWatch = watchClicks.length;
+        const byPlatform = new Map<number, number>();
+        for (const c of watchClicks as any[]) {
+          if (c.provider_id == null) continue;
+          byPlatform.set(c.provider_id, (byPlatform.get(c.provider_id) ?? 0) + 1);
+        }
+        const platforms = [...byPlatform.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([id, count]) => ({ id, name: PROVIDER_NAMES[id] ?? `Provider #${id}`, count }));
+        const byContent = new Map<string, number>();
+        for (const c of watchClicks as any[]) {
+          const k = `${c.media_type}:${c.tmdb_id}`;
+          byContent.set(k, (byContent.get(k) ?? 0) + 1);
+        }
+        const topContent = [...byContent.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([k, count]) => {
+            const [mt, id] = k.split(":");
+            const meta = titleMap.get(k);
+            return { tmdb_id: Number(id), media_type: mt, title: meta?.title ?? `#${id}`, poster_path: meta?.poster_path ?? null, count };
+          });
+        const conversionRate = totalRecs ? (totalWatch / totalRecs) * 100 : 0;
+        return {
+          totalClicks: totalWatch,
+          trailerClicks,
+          platforms,
+          topContent,
+          conversionRate: Math.round(conversionRate * 10) / 10,
+        };
+      })(),
       series: { signups: signupsSeries, ratings: ratingsSeries, growth: growthSeries },
     };
   });

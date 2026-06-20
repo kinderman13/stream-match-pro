@@ -21,6 +21,8 @@ export interface ScoredRecommendation {
   match: number; // 0-100
   providers: { provider_id: number; provider_name: string }[];
   genres: string[];
+  trailerKey: string | null; // YouTube key
+  tmdbWatchUrl: string; // canonical fallback
 }
 
 export async function buildRecommendations(opts: {
@@ -198,6 +200,10 @@ export async function buildRecommendations(opts: {
         if (!ok) continue;
       }
       const matchPct = Math.max(50, Math.min(99, Math.round((c.score / maxScore) * 95 + 4)));
+      const videos = (details.videos?.results || []) as any[];
+      const yt = videos.find((v) => v.site === "YouTube" && v.type === "Trailer" && v.official)
+        ?? videos.find((v) => v.site === "YouTube" && v.type === "Trailer")
+        ?? videos.find((v) => v.site === "YouTube");
       final.push({
         id: c.item.id,
         media_type: c.type,
@@ -210,6 +216,8 @@ export async function buildRecommendations(opts: {
         match: matchPct,
         providers: brProviders.map((p) => ({ provider_id: p.provider_id, provider_name: p.provider_name })),
         genres: (details.genres || []).map((g: any) => g.name),
+        trailerKey: yt?.key ?? null,
+        tmdbWatchUrl: `https://www.themoviedb.org/${c.type}/${c.item.id}/watch?locale=BR`,
       });
     } catch {
       // skip
