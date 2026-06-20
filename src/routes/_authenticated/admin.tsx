@@ -86,6 +86,7 @@ function AdminPage() {
     { id: "alerts", label: "Alertas" },
     { id: "logs", label: "Logs" },
     { id: "dna", label: "DNA" },
+    { id: "resets", label: "Resets" },
     { id: "settings", label: "Configurações" },
   ];
 
