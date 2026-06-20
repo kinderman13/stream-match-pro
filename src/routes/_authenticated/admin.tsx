@@ -135,6 +135,7 @@ function AdminPage() {
         {tab === "logs" && <Logs q={logsQ} />}
         {tab === "settings" && <Settings q={settingsQ} update={updateSettingFn} qc={qc} />}
         {tab === "dna" && <DnaStats q={dnaStatsQ} />}
+        {tab === "resets" && <ResetStats q={resetStatsQ} />}
       </div>
     </div>
   );
