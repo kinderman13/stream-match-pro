@@ -329,6 +329,7 @@ function Platforms({ data }: { data: any }) {
 
 function Recs({ data }: { data: any }) {
   const r = data.recommendations;
+  const w = data.watchNow ?? { totalClicks: 0, trailerClicks: 0, platforms: [], topContent: [], conversionRate: 0 };
   return (
     <>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -341,6 +342,44 @@ function Recs({ data }: { data: any }) {
       <p className="mt-4 text-xs text-muted-foreground">
         Métricas calculadas comparando interações (like/dislike/watched) contra total de recomendações geradas.
       </p>
+
+      <Section title="▶️ Assistir Agora">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Kpi icon="▶️" label="Cliques Assistir Agora" value={w.totalClicks} tone="good" />
+          <Kpi icon="🎬" label="Cliques em Trailer" value={w.trailerClicks} />
+          <Kpi icon="🎯" label="Conversão recs → play" value={`${w.conversionRate}%`} tone="good" />
+          <Kpi icon="🏷️" label="Plataformas distintas" value={w.platforms.length} />
+        </div>
+        <div className="mt-4 grid gap-6 md:grid-cols-2">
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h3 className="mb-3 font-bold">Cliques por plataforma</h3>
+            {w.platforms.length === 0 ? (
+              <div className="text-xs text-muted-foreground">Nenhum clique registrado ainda.</div>
+            ) : (
+              <ul className="space-y-1 text-sm">
+                {w.platforms.map((p: any) => (
+                  <li key={p.id} className="flex justify-between"><span>{p.name}</span><span className="font-mono">{p.count}</span></li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h3 className="mb-3 font-bold">Top conteúdo (cliques)</h3>
+            {w.topContent.length === 0 ? (
+              <div className="text-xs text-muted-foreground">Sem dados ainda.</div>
+            ) : (
+              <ul className="space-y-1 text-sm">
+                {w.topContent.map((c: any) => (
+                  <li key={`${c.media_type}:${c.tmdb_id}`} className="flex justify-between gap-2">
+                    <span className="truncate">{c.media_type === "tv" ? "📺" : "🎬"} {c.title}</span>
+                    <span className="font-mono">{c.count}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </Section>
     </>
   );
 }
