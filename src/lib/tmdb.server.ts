@@ -67,6 +67,8 @@ export interface MediaItem {
   backdrop_path: string | null;
   year: string;
   vote_average: number;
+  vote_count: number;
+  popularity: number;
   overview: string;
   genre_ids: number[];
 }
@@ -83,6 +85,8 @@ function normalize(raw: any, fallbackType: MediaType): MediaItem {
     backdrop_path: raw.backdrop_path ?? null,
     year: date ? date.slice(0, 4) : "",
     vote_average: Number(raw.vote_average ?? 0),
+    vote_count: Number(raw.vote_count ?? 0),
+    popularity: Number(raw.popularity ?? 0),
     overview: raw.overview ?? "",
     genre_ids: raw.genre_ids ?? [],
   };

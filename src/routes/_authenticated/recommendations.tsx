@@ -11,12 +11,20 @@ export const Route = createFileRoute("/_authenticated/recommendations")({
   component: Recs,
 });
 
+type RecBadge = "trending" | "highly_rated" | "classic" | "most_watched" | null;
 interface Rec {
   id: number; media_type: "movie" | "tv"; title: string; poster_path: string | null;
   year: string; vote_average: number; overview: string; match: number;
   providers: { provider_id: number; provider_name: string }[]; genres: string[];
-  trailerKey: string | null; tmdbWatchUrl: string;
+  trailerKey: string | null; tmdbWatchUrl: string; badge?: RecBadge;
 }
+
+const BADGE_META: Record<Exclude<RecBadge, null>, { label: string; className: string }> = {
+  trending:     { label: "🔥 Em Alta",           className: "bg-orange-500/20 text-orange-300 border-orange-500/40" },
+  highly_rated: { label: "⭐ Altamente Avaliado", className: "bg-yellow-500/20 text-yellow-300 border-yellow-500/40" },
+  classic:      { label: "🏆 Clássico Imperdível", className: "bg-amber-500/20 text-amber-300 border-amber-500/40" },
+  most_watched: { label: "👥 Mais Assistido",     className: "bg-blue-500/20 text-blue-300 border-blue-500/40" },
+};
 
 function Recs() {
   const recsFn = useServerFn(tmdbRecommendations);
@@ -161,6 +169,11 @@ function Recs() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-base font-bold sm:text-lg">{it.title} <span className="font-normal text-muted-foreground">({it.year})</span></div>
+                    {it.badge && BADGE_META[it.badge] && (
+                      <span className={`mt-1 inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${BADGE_META[it.badge].className}`}>
+                        {BADGE_META[it.badge].label}
+                      </span>
+                    )}
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       <span>★ {it.vote_average.toFixed(1)}</span>
                       {it.genres.slice(0, 3).map((g) => <span key={g}>{g}</span>)}
