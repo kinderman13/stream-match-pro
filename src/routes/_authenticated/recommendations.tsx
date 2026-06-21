@@ -51,14 +51,41 @@ function Recs() {
     /* eslint-disable-next-line */
   }, []);
 
-  async function react(item: Rec, action: "like" | "dislike" | "watched" | "save") {
-    await interact({ data: { tmdbId: item.id, mediaType: item.media_type, action } });
-    if (action === "save") {
+  function removeFromFeed(item: Rec) {
+    setItems((prev) => prev.filter((x) => !(x.id === item.id && x.media_type === item.media_type)));
+  }
+
+  async function handleLike(item: Rec) {
+    try {
+      await interact({ data: { tmdbId: item.id, mediaType: item.media_type, action: "like" } });
+      removeFromFeed(item);
+      toast.success("✅ Gostei registrado");
+    } catch (e) { console.error(e); toast.error("Não foi possível registrar."); }
+  }
+
+  async function handleDislike(item: Rec) {
+    try {
+      await interact({ data: { tmdbId: item.id, mediaType: item.media_type, action: "dislike" } });
+      await rate({ data: { tmdbId: item.id, mediaType: item.media_type, rating: 2, source: "recommendation", title: item.title, posterPath: item.poster_path } });
+      removeFromFeed(item);
+      toast.success("✅ Preferência atualizada");
+    } catch (e) { console.error(e); toast.error("Não foi possível registrar."); }
+  }
+
+  async function handleSkip(item: Rec) {
+    try {
+      await interact({ data: { tmdbId: item.id, mediaType: item.media_type, action: "skip" } });
+      removeFromFeed(item);
+      toast.success("✅ Conteúdo ocultado por 15 dias");
+    } catch (e) { console.error(e); toast.error("Não foi possível registrar."); }
+  }
+
+  async function handleSave(item: Rec) {
+    try {
+      await interact({ data: { tmdbId: item.id, mediaType: item.media_type, action: "save" } });
       await save({ data: { tmdbId: item.id, mediaType: item.media_type, title: item.title, posterPath: item.poster_path, year: item.year } });
-    }
-    if (action === "watched" || action === "dislike") {
-      setItems((prev) => prev.filter((x) => !(x.id === item.id && x.media_type === item.media_type)));
-    }
+      toast.success("✅ Adicionado à sua lista");
+    } catch (e) { console.error(e); toast.error("Não foi possível salvar."); }
   }
 
   async function watchNow(item: Rec) {
@@ -80,7 +107,12 @@ function Recs() {
 
   async function saveRating(rating: number) {
     if (!target) return;
-    await rate({ data: { tmdbId: target.id, mediaType: target.media_type, rating, source: "recommendation", title: target.title, posterPath: target.poster_path } });
+    try {
+      await interact({ data: { tmdbId: target.id, mediaType: target.media_type, action: "watched" } });
+      await rate({ data: { tmdbId: target.id, mediaType: target.media_type, rating, source: "recommendation", title: target.title, posterPath: target.poster_path } });
+      removeFromFeed(target);
+      toast.success("✅ Nota salva");
+    } catch (e) { console.error(e); toast.error("Não foi possível salvar."); }
     setTarget(null);
   }
 
