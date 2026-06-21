@@ -199,19 +199,43 @@ function Recs() {
                     </button>
                   )}
                   <button
-                    onClick={() => react(it, "save")}
+                    onClick={() => handleSave(it)}
                     className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-semibold hover:border-primary"
                   >
                     ➕ Minha Lista
                   </button>
                 </div>
 
-                {/* Secondary feedback */}
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <button onClick={() => react(it, "like")} className="rounded-md border border-border bg-secondary px-2.5 py-1 text-xs hover:border-success" title="Gostei">👍</button>
-                  <button onClick={() => react(it, "dislike")} className="rounded-md border border-border bg-secondary px-2.5 py-1 text-xs hover:border-destructive" title="Não gostei">👎</button>
-                  <button onClick={() => react(it, "watched")} className="rounded-md border border-border bg-secondary px-2.5 py-1 text-xs hover:border-foreground" title="Já assisti">👀</button>
-                  <button onClick={() => setTarget(it)} className="rounded-md border border-border bg-secondary px-2.5 py-1 text-xs hover:border-primary">Avaliar</button>
+                {/* Unified rating actions — same as Tinder screen */}
+                <div className="mt-3 grid grid-cols-4 gap-2">
+                  <button
+                    onClick={() => handleLike(it)}
+                    className="flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-border bg-secondary px-2 py-2.5 transition hover:border-success hover:bg-success/10 active:scale-95"
+                  >
+                    <span className="text-2xl leading-none">👍</span>
+                    <span className="text-[11px] font-semibold leading-tight">Gostei</span>
+                  </button>
+                  <button
+                    onClick={() => setTarget(it)}
+                    className="flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-border bg-secondary px-2 py-2.5 transition hover:border-blue-500 hover:bg-blue-500/10 active:scale-95"
+                  >
+                    <span className="text-2xl leading-none">👀</span>
+                    <span className="text-[11px] font-semibold leading-tight">Já Assisti</span>
+                  </button>
+                  <button
+                    onClick={() => handleSkip(it)}
+                    className="flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-border bg-secondary px-2 py-2.5 transition hover:border-foreground hover:bg-foreground/10 active:scale-95"
+                  >
+                    <span className="text-2xl leading-none">🤔</span>
+                    <span className="text-[11px] font-semibold leading-tight">Não Assisti</span>
+                  </button>
+                  <button
+                    onClick={() => handleDislike(it)}
+                    className="flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-border bg-secondary px-2 py-2.5 transition hover:border-destructive hover:bg-destructive/10 active:scale-95"
+                  >
+                    <span className="text-2xl leading-none">👎</span>
+                    <span className="text-[11px] font-semibold leading-tight">Não Gostei</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -220,6 +244,7 @@ function Recs() {
       </div>
 
       <RatingDialog open={!!target} title={target?.title || ""} onClose={() => setTarget(null)} onSubmit={saveRating} />
+
 
       {trailer && (
         <div
