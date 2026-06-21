@@ -169,6 +169,11 @@ function Recs() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-base font-bold sm:text-lg">{it.title} <span className="font-normal text-muted-foreground">({it.year})</span></div>
+                    {it.badge && BADGE_META[it.badge] && (
+                      <span className={`mt-1 inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${BADGE_META[it.badge].className}`}>
+                        {BADGE_META[it.badge].label}
+                      </span>
+                    )}
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       <span>★ {it.vote_average.toFixed(1)}</span>
                       {it.genres.slice(0, 3).map((g) => <span key={g}>{g}</span>)}
