@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { tmdbRecommendations } from "@/lib/tmdb.functions";
 import { addInteraction, addToWatchlist, upsertRating, getUserState } from "@/lib/user-data.functions";
 import { RatingDialog } from "@/components/RatingDialog";
